@@ -1,0 +1,22 @@
+[project]
+name = "performance_genai"
+version = "0.0.1"
+description = "Performance creative generation prototype (FastAPI + Gemini/OpenAI)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.24",
+  "python-multipart>=0.0.9",
+  "jinja2>=3.1",
+  "pillow>=10.0",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "python-dotenv>=1.0",
+  "aiofiles>=23.2",
+  "google-genai>=0.3.0",
+  "openai>=1.30",
+]
+
+[tool.uv]
+package = true

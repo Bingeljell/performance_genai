@@ -1,1 +1,10 @@
 spec.md
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+data/
+.env

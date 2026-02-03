@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>performance_genai</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Arial; margin: 20px; }
+      .row { display: flex; gap: 24px; align-items: flex-start; }
+      .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
+      a { color: #0a58ca; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      input[type=text] { padding: 8px; width: 320px; }
+      button { padding: 8px 12px; }
+      ul { padding-left: 18px; }
+    </style>
+  </head>
+  <body>
+    <h1>performance_genai prototype</h1>
+    <div class="row">
+      <div class="card">
+        <h2>Create project</h2>
+        <form method="post" action="/projects">
+          <div>
+            <input type="text" name="name" placeholder="Project name" required />
+          </div>
+          <div style="margin-top: 10px;">
+            <button type="submit">Create</button>
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Projects</h2>
+        {% if projects %}
+          <ul>
+            {% for p in projects %}
+              <li>
+                <a href="/projects/{{ p.project_id }}">{{ p.name }}</a>
+                <small>(created {{ p.created_at }})</small>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>No projects yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </body>
+</html>
+
