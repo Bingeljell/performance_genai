@@ -18,3 +18,4 @@
 - **2026-02-03 > src/performance_genai/api/templates/project.html > n/a > add open link for KV thumbnails**
 - **2026-02-03 > src/performance_genai/api/app.py > bulk_delete_assets > add bulk-delete endpoint for deleting multiple assets at once**
 - **2026-02-03 > src/performance_genai/api/templates/project.html > n/a > add KV/master multi-select checkboxes and bulk delete buttons**
+- **2026-02-03 > docs/implementation_progress.md > n/a > document current prototype progress and propose next-step workflow simplification**
