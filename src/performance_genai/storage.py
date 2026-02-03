@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -98,6 +99,36 @@ class ProjectStore:
             assets=assets,
             observed_profile=data.get("observed_profile"),
         )
+
+    def delete_project(self, project_id: str) -> None:
+        proj_dir = (self.projects_dir / project_id).resolve()
+        if not str(proj_dir).startswith(str(self.projects_dir.resolve()) + os.sep):
+            raise ValueError("Refusing to delete outside projects_dir")
+        if proj_dir.exists():
+            shutil.rmtree(proj_dir)
+
+    def delete_asset(self, project_id: str, asset_id: str) -> None:
+        proj = self.read_project(project_id)
+        remaining: list[Asset] = []
+        removed: list[Asset] = []
+        for a in proj.assets:
+            if a.asset_id == asset_id:
+                removed.append(a)
+            else:
+                remaining.append(a)
+        if not removed:
+            return
+
+        proj.assets = remaining
+        self._write_project(proj)
+
+        for a in removed:
+            path = self.abs_asset_path(project_id, a)
+            try:
+                path.unlink(missing_ok=True)
+            except Exception:
+                # Best-effort deletion in v0.
+                pass
 
     def add_asset(
         self,

@@ -164,7 +164,10 @@ class GeminiProvider:
             resp = self.client.models.generate_content(
                 model=model,
                 contents=contents,
-                config=types.GenerateContentConfig(response_modalities=["image", "text"]),
+                config=types.GenerateContentConfig(
+                    response_modalities=["image", "text"],
+                    image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
+                ),
             )
 
             extracted = _extract_images_from_generate_content(resp)
@@ -187,6 +190,140 @@ class GeminiProvider:
                 break
 
         return out
+
+    async def reframe_kv_with_motif(
+        self,
+        kv_image: Path,
+        motif_image: Path | None,
+        prompt: str,
+        aspect_ratio: str,
+        image_size: str = "2K",
+        n: int = 1,
+    ) -> list[GeneratedImage]:
+        """
+        Generate a text-free "master visual" variant by asking the image model to:
+        - keep the KV scene/subject identity
+        - reframe/outpaint to the requested aspect ratio
+        - integrate the motif as a background design element
+
+        This intentionally avoids deterministic compositing so the model can
+        handle better spatial interaction (motif behind subject).
+        """
+        from google.genai import types  # type: ignore
+
+        model = settings.gemini_image_model
+        if model.startswith("imagen-"):
+            # v0: this experiment targets the multimodal image-preview models.
+            raise ValueError("reframe_kv_with_motif requires a gemini image-preview model")
+
+        # The API layer appends strict constraints; keep this wrapper simple.
+        enriched = (
+            "IMPORTANT:\n"
+            "- The FIRST image is the base KV. Preserve it.\n"
+            "- If a SECOND image is provided, it is a motif reference.\n"
+            f"\n{prompt}\n"
+        )
+
+        out: list[GeneratedImage] = []
+        for _ in range(max(1, n)):
+            contents: list[Any] = [enriched]
+
+            # Provide a "locked canvas" input (base image centered on a larger canvas)
+            # so the model is biased toward only filling the empty margins.
+            base_img = Image.open(kv_image).convert("RGB")
+            locked = _make_outpaint_canvas(base_img, aspect_ratio=aspect_ratio)
+            contents.append(locked)
+            if motif_image is not None:
+                contents.append(Image.open(motif_image))
+
+            resp = self.client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_modalities=["image", "text"],
+                    image_config=types.ImageConfig(aspect_ratio=aspect_ratio, image_size=image_size),
+                ),
+            )
+
+            extracted = _extract_images_from_generate_content(resp)
+            for img, meta in extracted:
+                out.append(
+                    GeneratedImage(
+                        image=img,
+                        prompt_used=enriched,
+                        provider=self.name,
+                        model=model,
+                        seed=None,
+                        raw_metadata=meta | {"aspect_ratio": aspect_ratio, "image_size": image_size},
+                    )
+                )
+                if len(out) >= n:
+                    return out
+            if not extracted:
+                break
+        return out
+
+
+def _parse_ratio(aspect_ratio: str) -> tuple[int, int] | None:
+    s = (aspect_ratio or "").strip()
+    if ":" not in s:
+        return None
+    try:
+        a, b = s.split(":", 1)
+        return int(a), int(b)
+    except Exception:
+        return None
+
+
+def _make_outpaint_canvas(base: Image.Image, aspect_ratio: str) -> Image.Image:
+    """
+    Create a larger canvas at the requested aspect ratio, without cropping the base:
+    - if target is wider, expand width and center base
+    - if target is taller, expand height and center base
+
+    The empty margin is filled with a mid-gray + subtle noise to encourage inpaint/outpaint.
+    """
+    ratio = _parse_ratio(aspect_ratio)
+    if ratio is None:
+        return base
+    a, b = ratio
+    ow, oh = base.size
+    if ow <= 0 or oh <= 0:
+        return base
+
+    target_r = a / b
+    cur_r = ow / oh
+    if cur_r < target_r:
+        # Expand width
+        tw = int(round(oh * target_r))
+        th = oh
+    else:
+        # Expand height
+        tw = ow
+        th = int(round(ow / target_r))
+
+    tw = max(tw, ow)
+    th = max(th, oh)
+
+    # Mid-gray background with tiny noise so the model doesn't treat it as "intentional black bars".
+    canvas = Image.new("RGB", (tw, th), (128, 128, 128))
+    # Very light noise pattern.
+    try:
+        import random
+
+        px = canvas.load()
+        for _ in range(int(tw * th * 0.002)):
+            x = random.randint(0, tw - 1)
+            y = random.randint(0, th - 1)
+            v = 120 + random.randint(0, 20)
+            px[x, y] = (v, v, v)
+    except Exception:
+        pass
+
+    x0 = (tw - ow) // 2
+    y0 = (th - oh) // 2
+    canvas.paste(base, (x0, y0))
+    return canvas
 
 
 def _strip_code_fences(text: str) -> str:

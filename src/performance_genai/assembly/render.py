@@ -19,7 +19,8 @@ def render_master_simple(
     motif: Image.Image | None = None,
     motif_opacity: float = 0.14,
     motif_tint_hex: str = "#266156",
-    protect_preset: str = "right",
+    motif_position: str = "right",
+    subject_position: str = "right",
 ) -> RenderedMaster:
     """
     Minimal deterministic renderer:
@@ -37,7 +38,8 @@ def render_master_simple(
             motif=motif,
             opacity=motif_opacity,
             tint_hex=motif_tint_hex,
-            protect_preset=protect_preset,
+            motif_position=motif_position,
+            subject_position=subject_position,
         )
 
     # Give 9:16 more room since copy blocks tend to be taller.
@@ -207,7 +209,8 @@ def _apply_motif_overlay(
     motif: Image.Image,
     opacity: float,
     tint_hex: str,
-    protect_preset: str,
+    motif_position: str,
+    subject_position: str,
 ) -> Image.Image:
     """
     Apply a brand motif behind everything, but avoid painting over the subject region.
@@ -215,17 +218,36 @@ def _apply_motif_overlay(
     """
     w, h = base_rgba.size
 
-    # Scale motif to cover the canvas (similar to cover-crop) so it reads as a background element.
-    motif_rgba = _resize_cover(motif.convert("RGBA"), (w, h))
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
 
-    # Recolor/tint the motif to a brand color, keeping alpha from the original.
-    tint = _hex_to_rgb(tint_hex)
-    r, g, b, a = motif_rgba.split()
-    # Use luminance as a mask to capture line-art even if alpha is missing/weak.
-    lum = Image.merge("RGB", (r, g, b)).convert("L")
-    mask = Image.eval(lum, lambda px: px)  # identity; kept for clarity
-    tinted = Image.new("RGBA", (w, h), (tint[0], tint[1], tint[2], 255))
-    tinted.putalpha(mask)
+    mp = (motif_position or "right").strip().lower()
+    if mp in ("full", "cover"):
+        # Full-canvas motif (rarely desired once you start doing cover-crop masters).
+        motif_rgba = _resize_cover(motif.convert("RGBA"), (w, h))
+        x0, y0 = 0, 0
+    else:
+        # Place motif as a design element on one side, preserving its proportions.
+        # Default box: ~55% width on the chosen side, most of the height.
+        box_w = int(w * 0.56)
+        box_h = int(h * 0.90)
+        pad_x = int(w * 0.04)
+        pad_y = int(h * 0.05)
+        if mp in ("left", "l"):
+            box = (pad_x, pad_y, pad_x + box_w, pad_y + box_h)
+        elif mp in ("center", "c", "middle"):
+            box = ((w - box_w) // 2, pad_y, (w - box_w) // 2 + box_w, pad_y + box_h)
+        else:
+            box = (w - pad_x - box_w, pad_y, w - pad_x, pad_y + box_h)
+
+        bw = max(1, box[2] - box[0])
+        bh = max(1, box[3] - box[1])
+        motif_rgba = _contain(motif.convert("RGBA"), (bw, bh))
+
+        # Right-align within the box by default (matches common "logo outline" usage).
+        x0 = box[2] - motif_rgba.size[0]
+        y0 = box[1] + (bh - motif_rgba.size[1]) // 2
+
+    tinted = _tint_preserving_alpha(motif_rgba, tint_hex)
 
     # Apply global opacity.
     alpha_scale = max(0.0, min(1.0, opacity))
@@ -235,15 +257,53 @@ def _apply_motif_overlay(
         tinted.putalpha(ta)
 
     # Punch out the subject region.
-    protect = _protect_box_for_preset((w, h), protect_preset)
+    protect = _protect_box_for_preset((w, h), subject_position)
     if protect:
         x1, y1, x2, y2 = protect
         clear = Image.new("L", (x2 - x1, y2 - y1), 0)
         ta = tinted.split()[3]
-        ta.paste(clear, (x1, y1))
+        # Offset the protection box into the motif's local coordinate space.
+        local = (x1 - x0, y1 - y0)
+        ta.paste(clear, local)
         tinted.putalpha(ta)
 
-    return Image.alpha_composite(base_rgba, tinted)
+    overlay.paste(tinted, (x0, y0), tinted)
+    return Image.alpha_composite(base_rgba, overlay)
+
+
+def _contain(img: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """
+    Resize to fit within size (no crop), preserving aspect ratio.
+    """
+    tw, th = size
+    iw, ih = img.size
+    if iw <= 0 or ih <= 0:
+        return img.resize(size, Image.Resampling.LANCZOS)
+    scale = min(tw / iw, th / ih)
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+    return img.resize((nw, nh), Image.Resampling.LANCZOS)
+
+
+def _tint_preserving_alpha(img_rgba: Image.Image, tint_hex: str) -> Image.Image:
+    """
+    If tint_hex is empty, keep original colors. Otherwise, recolor using alpha
+    (or luminance fallback if alpha is missing/empty).
+    """
+    if not tint_hex or not tint_hex.strip():
+        return img_rgba
+
+    tint = _hex_to_rgb(tint_hex)
+    r, g, b, a = img_rgba.split()
+
+    # If alpha looks empty, fallback to luminance to capture line-art.
+    alpha_extrema = a.getextrema()
+    if alpha_extrema and alpha_extrema[1] == 0:
+        lum = Image.merge("RGB", (r, g, b)).convert("L")
+        a = lum
+
+    colored = Image.new("RGBA", img_rgba.size, (tint[0], tint[1], tint[2], 255))
+    colored.putalpha(a)
+    return colored
 
 
 def _ratio_key_for_size(size: tuple[int, int]) -> str:

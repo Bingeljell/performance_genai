@@ -64,6 +64,8 @@ def project_page(request: Request, project_id: str):
     kvs = [a for a in assets if a.kind == "kv"]
     masters = [a for a in assets if a.kind == "master"]
     motifs = [a for a in assets if a.kind == "motif"]
+    selected_kv = request.query_params.get("kv") or ""
+    selected_headline = request.query_params.get("headline") or ""
 
     observed_profile_pretty = None
     if proj.observed_profile is not None:
@@ -97,6 +99,8 @@ def project_page(request: Request, project_id: str):
             "observed_profile": proj.observed_profile,
             "observed_profile_pretty": observed_profile_pretty,
             "headlines": headlines,
+            "selected_kv": selected_kv,
+            "selected_headline": selected_headline,
         },
     )
 
@@ -119,6 +123,27 @@ async def upload_asset(
         metadata={"content_type": file.content_type},
         subdir=subdir,
     )
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+@app.post("/projects/{project_id}/delete")
+def delete_project(project_id: str):
+    store.delete_project(project_id)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/projects/{project_id}/assets/{asset_id}/delete")
+def delete_asset(project_id: str, asset_id: str):
+    store.delete_asset(project_id, asset_id)
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+@app.post("/projects/{project_id}/assets/bulk_delete")
+def bulk_delete_assets(project_id: str, asset_ids: list[str] = Form(default=[])):
+    # v0: best-effort bulk delete for faster iteration.
+    for asset_id in asset_ids:
+        try:
+            store.delete_asset(project_id, asset_id)
+        except Exception:
+            continue
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
 
@@ -203,6 +228,93 @@ async def generate_kvs(
     )
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
+@app.post("/projects/{project_id}/kvs/reframe")
+async def reframe_kv(
+    project_id: str,
+    kv_asset_id: str = Form(...),
+    motif_asset_id: str = Form(""),
+    aspect_ratio: str = Form("9:16"),
+    image_size: str = Form("2K"),
+    n: int = Form(1),
+    prompt: str = Form("Reframe this KV to the target aspect ratio and integrate the motif as a background brand element."),
+):
+    proj = store.read_project(project_id)
+    kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
+    if not kv_asset:
+        raise HTTPException(status_code=400, detail="kv_asset_id must be an existing KV asset")
+
+    motif_path: Path | None = None
+    if motif_asset_id:
+        motif_asset = next((a for a in proj.assets if a.asset_id == motif_asset_id and a.kind == "motif"), None)
+        if motif_asset:
+            motif_path = store.abs_asset_path(project_id, motif_asset)
+
+    kv_path = store.abs_asset_path(project_id, kv_asset)
+    gemini = _get_gemini()
+
+    # Add strong constraints to reduce drift. If motif isn't provided, explicitly
+    # instruct the model not to invent one.
+    sys_constraints = (
+        "OUTPUT MUST CONTAIN NO TEXT, NO LOGOS, NO WATERMARKS.\n"
+        "Preserve the base image exactly; only outpaint/extend into new canvas area to reach the target aspect ratio.\n"
+        "Do not change the subject identity, clothing, face, pose, or scene lighting.\n"
+    )
+    if motif_path is None:
+        sys_constraints += "Do not add any motif/brand outline/overlay elements.\n"
+    else:
+        sys_constraints += (
+            "Use the provided motif image exactly as reference; keep its shape consistent.\n"
+            "Place it on the right side behind the subject (subject occludes motif). Do not cover faces/hands.\n"
+        )
+
+    images = await gemini.reframe_kv_with_motif(
+        kv_image=kv_path,
+        motif_image=motif_path,
+        prompt=f"{prompt}\n\n{sys_constraints}",
+        aspect_ratio=aspect_ratio,
+        image_size=image_size,
+        n=int(n),
+    )
+
+    kv_asset_ids: list[str] = []
+    for idx, gi in enumerate(images):
+        buf = _pil_to_png_bytes(gi.image)
+        asset = store.add_asset(
+            project_id=project_id,
+            kind="kv",
+            filename=f"kv_reframe_{idx}.png",
+            content=buf,
+            metadata={
+                "provider": gi.provider,
+                "model": gi.model,
+                "prompt": gi.prompt_used,
+                "source_kv_asset_id": kv_asset_id,
+                "motif_asset_id": motif_asset_id or None,
+                "aspect_ratio": aspect_ratio,
+                "image_size": image_size,
+            },
+            subdir="kvs",
+        )
+        kv_asset_ids.append(asset.asset_id)
+
+    store.write_run_manifest(
+        project_id,
+        {
+            "type": "kv_reframe",
+            "provider": gemini.name,
+            "model": settings.gemini_image_model,
+            "inputs": {
+                "kv_asset_id": kv_asset_id,
+                "motif_asset_id": motif_asset_id or None,
+                "aspect_ratio": aspect_ratio,
+                "image_size": image_size,
+                "n_requested": int(n),
+            },
+            "outputs": {"kv_asset_ids": kv_asset_ids},
+        },
+    )
+    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
 
 @app.post("/projects/{project_id}/copy/headlines")
 async def generate_headlines(
@@ -252,14 +364,19 @@ async def generate_headlines(
 async def build_masters(
     project_id: str,
     kv_asset_id: str = Form(...),
-    headline: str = Form(...),
+    headline: str = Form(""),
+    headline_select: str = Form(""),
     cta: str = Form("Learn more"),
     motif_asset_id: str = Form(""),
     motif_opacity: float = Form(0.14),
     motif_tint_hex: str = Form("#266156"),
-    protect_preset: str = Form("right"),
+    motif_position: str = Form("right"),
+    subject_position: str = Form("right"),
 ):
     proj = store.read_project(project_id)
+    use_headline = (headline_select or "").strip() or (headline or "").strip()
+    if not use_headline:
+        raise HTTPException(status_code=400, detail="headline is required (type one or select one)")
     kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
     if not kv_asset:
         raise HTTPException(status_code=400, detail="kv_asset_id must be an existing KV asset")
@@ -282,12 +399,13 @@ async def build_masters(
         rendered = render_master_simple(
             kv=kv_img,
             size=size,
-            headline=headline,
+            headline=use_headline,
             cta=cta,
             motif=motif_img,
             motif_opacity=float(motif_opacity),
             motif_tint_hex=motif_tint_hex,
-            protect_preset=protect_preset,
+            motif_position=motif_position,
+            subject_position=subject_position,
         )
         out_bytes = _pil_to_png_bytes(rendered.image)
         asset = store.add_asset(
@@ -298,12 +416,13 @@ async def build_masters(
             metadata={
                 "ratio": ratio,
                 "kv_asset_id": kv_asset_id,
-                "headline": headline,
+                "headline": use_headline,
                 "cta": cta,
                 "motif_asset_id": motif_asset_id or None,
                 "motif_opacity": float(motif_opacity),
                 "motif_tint_hex": motif_tint_hex,
-                "protect_preset": protect_preset,
+                "motif_position": motif_position,
+                "subject_position": subject_position,
             },
             subdir="masters",
         )
