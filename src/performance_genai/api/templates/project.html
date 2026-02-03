@@ -30,6 +30,7 @@
           <select name="kind">
             <option value="reference">reference</option>
             <option value="product">product</option>
+            <option value="motif">motif (transparent PNG/SVG)</option>
           </select>
           <div style="margin-top:8px;">
             <input type="file" name="file" accept="image/*" required />
@@ -48,7 +49,7 @@
         {% if observed_profile %}
           <details style="margin-top:10px;">
             <summary>View observed_profile</summary>
-            <pre style="white-space: pre-wrap;">{{ observed_profile | tojson(indent=2) }}</pre>
+            <pre style="white-space: pre-wrap;">{{ observed_profile_pretty }}</pre>
           </details>
         {% endif %}
       </div>
@@ -58,6 +59,13 @@
         <form method="post" action="/projects/{{ project.project_id }}/kvs/generate">
           <label>Prompt</label>
           <textarea name="prompt" required placeholder="e.g., lifestyle scene..."></textarea>
+          <div style="margin-top:8px;">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" name="use_images" value="true" checked />
+              Use uploaded reference/product images as visual refs
+            </label>
+            <div class="muted">For `gemini-3-pro-image-preview`, we send those images as multimodal inputs (not just text).</div>
+          </div>
           <div style="display:flex; gap:10px; margin-top:8px;">
             <div style="flex:1;">
               <label>N</label>
@@ -81,6 +89,12 @@
         <form method="post" action="/projects/{{ project.project_id }}/copy/headlines">
           <label>Brief</label>
           <textarea name="brief_text" required placeholder="Product details, offer, objective, constraints..."></textarea>
+          <div style="margin-top:8px;">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" name="use_images" value="true" />
+              Use uploaded images as reference
+            </label>
+          </div>
           <label>Count</label>
           <input type="number" name="count" value="10" min="3" max="30" />
           <button type="submit">Generate headlines</button>
@@ -100,6 +114,30 @@
           <input type="text" name="headline" placeholder="Headline" required />
           <label>CTA</label>
           <input type="text" name="cta" value="Learn more" />
+          <label>Motif (optional)</label>
+          <select name="motif_asset_id">
+            <option value="">(none)</option>
+            {% for m in motifs %}
+              <option value="{{ m.asset_id }}">{{ m.asset_id }} ({{ m.filename }})</option>
+            {% endfor %}
+          </select>
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <div style="flex:1;">
+              <label>Motif opacity</label>
+              <input type="number" name="motif_opacity" value="0.14" min="0" max="1" step="0.01" />
+            </div>
+            <div style="flex:1;">
+              <label>Motif tint hex</label>
+              <input type="text" name="motif_tint_hex" value="#266156" />
+            </div>
+          </div>
+          <label>Protect subject region (v0 heuristic)</label>
+          <select name="protect_preset">
+            <option value="right">right</option>
+            <option value="left">left</option>
+            <option value="center">center</option>
+            <option value="none">none</option>
+          </select>
           <button type="submit">Build 3 ratios</button>
         </form>
         {% if not kvs %}
@@ -136,6 +174,19 @@
       <p class="muted">No masters yet.</p>
     {% endif %}
 
+    <h2 style="margin-top:22px;">Headlines</h2>
+    {% if headlines %}
+      <div class="card">
+        <ol>
+          {% for h in headlines %}
+            <li>{{ h }}</li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% else %}
+      <p class="muted">No headlines yet.</p>
+    {% endif %}
+
     <h2 style="margin-top:22px;">All assets</h2>
     {% if assets %}
       <div class="grid">
@@ -154,4 +205,3 @@
     {% endif %}
   </body>
 </html>
-

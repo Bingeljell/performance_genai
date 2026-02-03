@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 from pathlib import Path
 from typing import Any
@@ -64,6 +63,28 @@ def project_page(request: Request, project_id: str):
     assets = list(reversed(proj.assets))
     kvs = [a for a in assets if a.kind == "kv"]
     masters = [a for a in assets if a.kind == "master"]
+    motifs = [a for a in assets if a.kind == "motif"]
+
+    observed_profile_pretty = None
+    if proj.observed_profile is not None:
+        try:
+            # If we stored an envelope, prefer showing the structured profile.
+            if isinstance(proj.observed_profile, dict) and "profile" in proj.observed_profile:
+                observed_profile_pretty = json.dumps(proj.observed_profile, indent=2)
+            else:
+                observed_profile_pretty = json.dumps(proj.observed_profile, indent=2)
+        except Exception:
+            observed_profile_pretty = str(proj.observed_profile)
+
+    headlines: list[str] = []
+    try:
+        proj_dir = Path(settings.data_dir) / "projects" / project_id
+        hl_path = proj_dir / "copy_headlines.json"
+        if hl_path.exists():
+            headlines = json.loads(hl_path.read_text("utf-8")).get("headlines", []) or []
+    except Exception:
+        headlines = []
+
     return templates.TemplateResponse(
         request=request,
         name="project.html",
@@ -72,7 +93,10 @@ def project_page(request: Request, project_id: str):
             "assets": assets,
             "kvs": kvs,
             "masters": masters,
+            "motifs": motifs,
             "observed_profile": proj.observed_profile,
+            "observed_profile_pretty": observed_profile_pretty,
+            "headlines": headlines,
         },
     )
 
@@ -84,13 +108,16 @@ async def upload_asset(
     file: UploadFile = File(...),
 ):
     content = await file.read()
+    subdir = "assets"
+    if kind == "motif":
+        subdir = "motifs"
     store.add_asset(
         project_id=project_id,
         kind=kind,
         filename=file.filename or "upload.bin",
         content=content,
         metadata={"content_type": file.content_type},
-        subdir="assets",
+        subdir=subdir,
     )
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
 
@@ -141,9 +168,12 @@ async def generate_kvs(
     prompt: str = Form(...),
     n: int = Form(2),
     aspect_ratio: str = Form("1:1"),
+    use_images: bool = Form(True),
 ):
     proj = store.read_project(project_id)
-    ref_paths = [store.abs_asset_path(project_id, a) for a in proj.assets if a.kind in ("reference", "product")]
+    ref_paths: list[Path] = []
+    if use_images:
+        ref_paths = [store.abs_asset_path(project_id, a) for a in proj.assets if a.kind in ("reference", "product")]
 
     gemini = _get_gemini()
     images = await gemini.generate(prompt=prompt, reference_images=ref_paths[:8], n=int(n), aspect_ratio=aspect_ratio)
@@ -167,7 +197,7 @@ async def generate_kvs(
             "type": "kv_generate",
             "provider": gemini.name,
             "model": settings.gemini_image_model,
-            "inputs": {"prompt": prompt, "n": int(n), "aspect_ratio": aspect_ratio},
+            "inputs": {"prompt": prompt, "n_requested": int(n), "aspect_ratio": aspect_ratio, "use_images": bool(use_images)},
             "outputs": {"kv_asset_ids": kv_asset_ids},
         },
     )
@@ -179,9 +209,27 @@ async def generate_headlines(
     project_id: str,
     brief_text: str = Form(...),
     count: int = Form(10),
+    use_images: bool = Form(False),
 ):
+    proj = store.read_project(project_id)
+    ref_paths = [store.abs_asset_path(project_id, a) for a in proj.assets if a.kind in ("reference", "product", "kv")]
+
+    # Optionally enrich the brief with brand-language cues extracted from images.
+    context_text = ""
+    if use_images and ref_paths:
+        gemini = _get_gemini()
+        context_text = await gemini.summarize_brand_language_for_copy(reference_images=ref_paths[:8], brief_text=brief_text)
+
+    full_brief = brief_text
+    if context_text.strip():
+        full_brief = (
+            f"{brief_text}\n\n"
+            "Brand-language cues extracted from reference images:\n"
+            f"{context_text.strip()}\n"
+        )
+
     openai = _get_openai_text()
-    lines = await openai.generate_copy(brief_text=brief_text, count=int(count))
+    lines = await openai.generate_copy(brief_text=full_brief, count=int(count))
 
     store.write_run_manifest(
         project_id,
@@ -189,7 +237,7 @@ async def generate_headlines(
             "type": "copy_headlines",
             "provider": openai.name,
             "model": settings.openai_text_model,
-            "inputs": {"count": int(count)},
+            "inputs": {"count": int(count), "use_images": bool(use_images)},
             "outputs": {"headlines": lines},
         },
     )
@@ -206,6 +254,10 @@ async def build_masters(
     kv_asset_id: str = Form(...),
     headline: str = Form(...),
     cta: str = Form("Learn more"),
+    motif_asset_id: str = Form(""),
+    motif_opacity: float = Form(0.14),
+    motif_tint_hex: str = Form("#266156"),
+    protect_preset: str = Form("right"),
 ):
     proj = store.read_project(project_id)
     kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
@@ -215,9 +267,28 @@ async def build_masters(
     kv_path = store.abs_asset_path(project_id, kv_asset)
     kv_img = Image.open(kv_path)
 
+    motif_img = None
+    if motif_asset_id:
+        motif_asset = next((a for a in proj.assets if a.asset_id == motif_asset_id and a.kind == "motif"), None)
+        if motif_asset:
+            motif_path = store.abs_asset_path(project_id, motif_asset)
+            try:
+                motif_img = Image.open(motif_path)
+            except Exception:
+                motif_img = None
+
     master_ids: list[str] = []
     for ratio, size in settings.master_sizes.items():
-        rendered = render_master_simple(kv=kv_img, size=size, headline=headline, cta=cta)
+        rendered = render_master_simple(
+            kv=kv_img,
+            size=size,
+            headline=headline,
+            cta=cta,
+            motif=motif_img,
+            motif_opacity=float(motif_opacity),
+            motif_tint_hex=motif_tint_hex,
+            protect_preset=protect_preset,
+        )
         out_bytes = _pil_to_png_bytes(rendered.image)
         asset = store.add_asset(
             project_id=project_id,
@@ -229,6 +300,10 @@ async def build_masters(
                 "kv_asset_id": kv_asset_id,
                 "headline": headline,
                 "cta": cta,
+                "motif_asset_id": motif_asset_id or None,
+                "motif_opacity": float(motif_opacity),
+                "motif_tint_hex": motif_tint_hex,
+                "protect_preset": protect_preset,
             },
             subdir="masters",
         )
@@ -253,4 +328,3 @@ def _pil_to_png_bytes(img: Image.Image) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
-

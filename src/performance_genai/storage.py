@@ -59,6 +59,7 @@ class ProjectStore:
         project_id = uuid.uuid4().hex[:12]
         proj_dir = self.projects_dir / project_id
         (proj_dir / "assets").mkdir(parents=True, exist_ok=True)
+        (proj_dir / "motifs").mkdir(parents=True, exist_ok=True)
         (proj_dir / "profiles").mkdir(parents=True, exist_ok=True)
         (proj_dir / "kvs").mkdir(parents=True, exist_ok=True)
         (proj_dir / "masters").mkdir(parents=True, exist_ok=True)
@@ -163,4 +164,3 @@ class ProjectStore:
         data = asdict(proj)
         data["assets"] = [asdict(a) for a in proj.assets]
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
