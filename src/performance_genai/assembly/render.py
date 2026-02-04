@@ -316,13 +316,22 @@ def _render_base_image(
         return _resize_contain(kv.convert("RGB"), size).convert("RGBA")
 
     tw, th = size
-    px = int(x * tw)
-    py = int(y * th)
-    pw = max(1, int(w * tw))
-    ph = max(1, int(h * th))
+    cx = x + (w / 2)
+    cy = y + (h / 2)
+
+    img_w, img_h = kv.size
+    if img_w <= 0 or img_h <= 0:
+        return _resize_contain(kv.convert("RGB"), size).convert("RGBA")
+
+    # Keep image aspect ratio; use width as the primary scale reference.
+    target_w = max(1, int(w * tw))
+    target_h = max(1, int(target_w * (img_h / img_w)))
+
+    px = int((cx * tw) - (target_w / 2))
+    py = int((cy * th) - (target_h / 2))
 
     base = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    resized = kv.convert("RGBA").resize((pw, ph), Image.Resampling.LANCZOS)
+    resized = kv.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
     base.paste(resized, (px, py), resized)
     return base
 
