@@ -76,3 +76,8 @@
 - **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers > render editor text layers at fixed font sizes without scrim**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add guide ratio selector for canvas framing and bump editor.js cache buster to v12**
 - **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > add ratio guide overlay, workspace resizing, and guide-aware text layer normalization**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout/render_text_layers > switch preview rendering to contain-fit (no crop) so guide ratios stay visible**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > submit normalized image box with preview payload so server can honor guide-based placement**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add hidden image_box field and bump editor.js cache buster to v13**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > accept image_box payload and pass through to preview renderers**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout/render_text_layers > render base image via normalized image box when provided**

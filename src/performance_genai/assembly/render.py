@@ -30,7 +30,7 @@ def render_master_simple(
 
     This is intentionally "v0 ugly but works". Templates come next.
     """
-    base = _resize_cover(kv.convert("RGB"), size).convert("RGBA")
+    base = _resize_contain(kv.convert("RGB"), size).convert("RGBA")
 
     if motif is not None:
         base = _apply_motif_overlay(
@@ -102,12 +102,13 @@ def render_text_layout(
     cta_box: tuple[float, float, float, float],
     text_align: str = "left",
     font_scale: float = 1.0,
+    image_box: dict | None = None,
 ) -> RenderedMaster:
     """
     Deterministic text overlay for editor previews.
     Boxes are normalized (x, y, w, h) in 0..1 coordinates.
     """
-    base = _resize_cover(kv.convert("RGB"), size).convert("RGBA")
+    base = _render_base_image(kv, size, image_box=image_box)
     draw = ImageDraw.Draw(base)
 
     align = (text_align or "left").strip().lower()
@@ -167,6 +168,7 @@ def render_text_layers(
     font_family: str,
     text_color_hex: str,
     text_align: str = "left",
+    image_box: dict | None = None,
 ) -> RenderedMaster:
     """
     Render multiple text boxes using absolute font sizes from the editor.
@@ -176,7 +178,7 @@ def render_text_layers(
       - font_size_norm: font px / canvas height
       - font_family, color, align (optional overrides)
     """
-    base = _resize_cover(kv.convert("RGB"), size).convert("RGBA")
+    base = _render_base_image(kv, size, image_box=image_box)
     draw = ImageDraw.Draw(base)
 
     default_align = (text_align or "left").strip().lower()
@@ -273,6 +275,56 @@ def _resize_cover(img: Image.Image, size: tuple[int, int]) -> Image.Image:
     left = max(0, (nw - tw) // 2)
     top = max(0, (nh - th) // 2)
     return resized.crop((left, top, left + tw, top + th))
+
+
+def _resize_contain(img: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """
+    Resize to fit inside the target canvas (no stretching), then center with padding.
+    """
+    tw, th = size
+    iw, ih = img.size
+    if iw <= 0 or ih <= 0:
+        return img.resize(size, Image.Resampling.LANCZOS)
+
+    scale = min(tw / iw, th / ih)
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+    resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    left = max(0, (tw - nw) // 2)
+    top = max(0, (th - nh) // 2)
+    canvas.paste(resized, (left, top))
+    return canvas
+
+
+def _render_base_image(
+    kv: Image.Image,
+    size: tuple[int, int],
+    image_box: dict | None = None,
+) -> Image.Image:
+    if not image_box:
+        return _resize_contain(kv.convert("RGB"), size).convert("RGBA")
+
+    try:
+        x = float(image_box.get("x", 0))
+        y = float(image_box.get("y", 0))
+        w = float(image_box.get("w", 1))
+        h = float(image_box.get("h", 1))
+    except (TypeError, ValueError):
+        return _resize_contain(kv.convert("RGB"), size).convert("RGBA")
+
+    if w <= 0 or h <= 0:
+        return _resize_contain(kv.convert("RGB"), size).convert("RGBA")
+
+    tw, th = size
+    px = int(x * tw)
+    py = int(y * th)
+    pw = max(1, int(w * tw))
+    ph = max(1, int(h * th))
+
+    base = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    resized = kv.convert("RGBA").resize((pw, ph), Image.Resampling.LANCZOS)
+    base.paste(resized, (px, py), resized)
+    return base
 
 
 def _norm_box_to_px(

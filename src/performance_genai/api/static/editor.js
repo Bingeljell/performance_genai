@@ -385,6 +385,19 @@
     return layers;
   }
 
+  function collectImageBox() {
+    var base = getGuideBounds();
+    if (!base || !base.width || !base.height) {
+      return null;
+    }
+    return {
+      x: (currentOffset.x - base.left) / base.width,
+      y: (currentOffset.y - base.top) / base.height,
+      w: imageSize.w / base.width,
+      h: imageSize.h / base.height,
+    };
+  }
+
   function collectAndSubmit() {
     if (!select.value) return;
     saveState();
@@ -394,6 +407,10 @@
     setHidden("form-align", alignSelect.value);
     setHidden("form-font-scale", fontScale.toFixed(3));
     setHidden("form-text-layers", JSON.stringify(collectTextLayers()));
+    var imageBox = collectImageBox();
+    if (imageBox) {
+      setHidden("form-image-box", JSON.stringify(imageBox));
+    }
     var form = document.getElementById("preview-form");
     if (form) form.submit();
   }

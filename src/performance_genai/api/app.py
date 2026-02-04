@@ -535,6 +535,7 @@ async def preview_text_layout(
     project_id: str,
     kv_asset_id: str = Form(...),
     text_layers: str = Form(""),
+    image_box: str = Form(""),
     headline: str = Form(""),
     subhead: str = Form(""),
     cta: str = Form("Learn more"),
@@ -575,6 +576,15 @@ async def preview_text_layout(
                 layers_payload = parsed
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=400, detail=f"text_layers must be JSON list: {exc}") from exc
+
+    image_box_payload: dict | None = None
+    if image_box.strip():
+        try:
+            parsed = json.loads(image_box)
+            if isinstance(parsed, dict):
+                image_box_payload = parsed
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"image_box must be JSON object: {exc}") from exc
 
     headline_box = _parse_box_from_form(headline_x, headline_y, headline_w, headline_h, (0.06, 0.60, 0.88, 0.16))
     subhead_box = _parse_box_from_form(subhead_x, subhead_y, subhead_w, subhead_h, (0.06, 0.76, 0.88, 0.08))
@@ -622,6 +632,7 @@ async def preview_text_layout(
                 font_family=font_family,
                 text_color_hex=text_color,
                 text_align=text_align,
+                image_box=image_box_payload,
             )
         else:
             rendered = render_text_layout(
@@ -637,6 +648,7 @@ async def preview_text_layout(
                 cta_box=cta_box,
                 text_align=text_align,
                 font_scale=float(font_scale),
+                image_box=image_box_payload,
             )
         out_bytes = _pil_to_png_bytes(rendered.image)
         label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename
@@ -672,6 +684,7 @@ async def preview_text_layout(
                 "layout_id": layout_id,
                 "ratios": ["1:1", "4:5", "9:16"],
                 "text_layers": len(layers_payload) if use_layers else None,
+                "image_box": image_box_payload,
             },
             "outputs": {"preview_asset_ids": preview_ids},
         },
