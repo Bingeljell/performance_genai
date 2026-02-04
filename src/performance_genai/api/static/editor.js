@@ -200,6 +200,98 @@
     return obj;
   }
 
+  function updateGuideRect(bounds) {
+    if (!bounds) return;
+    if (!guideRect) {
+      guideRect = new fabric.Rect({
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+        fill: "rgba(0,0,0,0)",
+        stroke: "#8fe4c7",
+        strokeWidth: 2,
+        strokeDashArray: [8, 6],
+        selectable: false,
+        evented: false,
+        hoverCursor: "default",
+        excludeFromExport: true,
+      });
+      canvas.add(guideRect);
+    } else {
+      guideRect.set({
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      });
+    }
+    canvas.sendToBack(guideRect);
+  }
+
+  function applyGuide(state, opts) {
+    var ratio = parseRatio(guideRatio) || { w: 1, h: 1 };
+    var guideW = imageSize.w;
+    var guideH = Math.round(guideW * ratio.h / ratio.w);
+    var canvasW = Math.max(imageSize.w, guideW);
+    var canvasH = Math.max(imageSize.h, guideH);
+    var nextOffset = {
+      x: Math.round((canvasW - imageSize.w) / 2),
+      y: Math.round((canvasH - imageSize.h) / 2),
+    };
+    var nextGuide = {
+      left: Math.round((canvasW - guideW) / 2),
+      top: Math.round((canvasH - guideH) / 2),
+      width: guideW,
+      height: guideH,
+    };
+    guideBounds = nextGuide;
+
+    canvas.setWidth(canvasW);
+    canvas.setHeight(canvasH);
+    if (canvas.wrapperEl) {
+      canvas.wrapperEl.style.width = canvasW + "px";
+      canvas.wrapperEl.style.height = canvasH + "px";
+    }
+    if (canvas.lowerCanvasEl) {
+      canvas.lowerCanvasEl.style.width = canvasW + "px";
+      canvas.lowerCanvasEl.style.height = canvasH + "px";
+    }
+    if (canvas.upperCanvasEl) {
+      canvas.upperCanvasEl.style.width = canvasW + "px";
+      canvas.upperCanvasEl.style.height = canvasH + "px";
+    }
+    canvasSize = { w: canvasW, h: canvasH };
+
+    if (stageEl) {
+      stageEl.style.width = canvasW + "px";
+      stageEl.style.height = canvasH + "px";
+    }
+    if (bgImg) {
+      bgImg.style.position = "absolute";
+      bgImg.style.left = nextOffset.x + "px";
+      bgImg.style.top = nextOffset.y + "px";
+      bgImg.style.width = imageSize.w + "px";
+      bgImg.style.height = imageSize.h + "px";
+    }
+
+    if (opts && opts.preserveText) {
+      var dx = nextOffset.x - currentOffset.x;
+      var dy = nextOffset.y - currentOffset.y;
+      if (dx || dy) {
+        getTextObjects().forEach(function (obj) {
+          obj.set({ left: obj.left + dx, top: obj.top + dy });
+        });
+      }
+    } else {
+      resetTextBoxes(state);
+    }
+
+    updateGuideRect(nextGuide);
+    currentOffset = nextOffset;
+    canvas.renderAll();
+  }
+
   function setBackground(kv, state) {
     if (!kv) return;
     log("Loading image: " + kv.url);
@@ -223,25 +315,9 @@
         bgImg.src = kv.url;
         bgImg.width = cw;
         bgImg.height = ch;
-        bgImg.style.width = cw + "px";
-        bgImg.style.height = ch + "px";
       }
-      canvas.setWidth(cw);
-      canvas.setHeight(ch);
-      if (canvas.wrapperEl) {
-        canvas.wrapperEl.style.width = cw + "px";
-        canvas.wrapperEl.style.height = ch + "px";
-      }
-      if (canvas.lowerCanvasEl) {
-        canvas.lowerCanvasEl.style.width = cw + "px";
-        canvas.lowerCanvasEl.style.height = ch + "px";
-      }
-      if (canvas.upperCanvasEl) {
-        canvas.upperCanvasEl.style.width = cw + "px";
-        canvas.upperCanvasEl.style.height = ch + "px";
-      }
-      canvasSize = { w: cw, h: ch };
-      resetTextBoxes(state);
+      imageSize = { w: cw, h: ch };
+      applyGuide(state);
       label.textContent = kv.label || kv.id;
       if (bgImg) {
         log("Image element size: " + bgImg.clientWidth + "x" + bgImg.clientHeight);
@@ -329,6 +405,7 @@
       text_color: colorInput.value,
       text_align: alignSelect.value,
       font_scale: fontScale,
+      guide_ratio: guideRatio,
       layers: collectTextLayers(),
     };
     try {
@@ -365,6 +442,13 @@
   fontSelect.addEventListener("change", updateAllStyles);
   colorInput.addEventListener("input", updateAllStyles);
   alignSelect.addEventListener("change", updateAllStyles);
+  if (guideSelect) {
+    guideSelect.addEventListener("change", function () {
+      guideRatio = guideSelect.value || "1:1";
+      applyGuide(null, { preserveText: true });
+      saveState();
+    });
+  }
   if (fontScaleInput) {
     fontScaleInput.addEventListener("input", function () {
       var next = parseFloat(fontScaleInput.value || "1") || 1;
@@ -412,6 +496,10 @@
     fontSelect.value = saved.font_family || fontSelect.value;
     colorInput.value = saved.text_color || colorInput.value;
     alignSelect.value = saved.text_align || alignSelect.value;
+    if (guideSelect && saved.guide_ratio) {
+      guideSelect.value = saved.guide_ratio;
+    }
+    guideRatio = (guideSelect && guideSelect.value) || guideRatio;
     if (fontScaleInput && saved.font_scale) {
       fontScale = parseFloat(saved.font_scale) || fontScale;
       fontScaleInput.value = fontScale;
@@ -419,9 +507,11 @@
     }
     setBackground(kvMap[saved.kv_asset_id], saved);
   } else if (select.value) {
+    guideRatio = (guideSelect && guideSelect.value) || guideRatio;
     setBackground(kvMap[select.value]);
   } else if (kvs.length) {
     select.value = kvs[0].id;
+    guideRatio = (guideSelect && guideSelect.value) || guideRatio;
     setBackground(kvMap[select.value]);
   }
     return true;

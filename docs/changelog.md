@@ -74,3 +74,5 @@
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > remove legacy headline/subhead/cta preview fields and bump editor.js cache buster to v11**
 - **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > accept text_layers payloads and route previews through layered renderer**
 - **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers > render editor text layers at fixed font sizes without scrim**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add guide ratio selector for canvas framing and bump editor.js cache buster to v12**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > add ratio guide overlay, workspace resizing, and guide-aware text layer normalization**
