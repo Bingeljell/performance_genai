@@ -24,7 +24,7 @@ These are small, high-leverage clarifications that will make the v1 implementati
   - provider/model + params
   - output artifact IDs + paths
 
-This is the difference between "CLI-first" and "reliably re-runnable".
+This is the difference between "one-off scripts" and "reliably re-runnable".
 
 ### 0.2 Observed vs Enforced Profile Schema (Control Plane Contract)
 
@@ -99,7 +99,7 @@ If you plan to extend this beyond a single team to the whole agency, assume you 
 - Secret management for provider keys (no keys in local dotfiles for shared deployments)
 - Cost/rate-limit controls (per-user and per-team budgets, concurrency limits)
 - A template/font registry (versioned templates, licensed fonts, approved logo packs) so outputs stay consistent across teams
-- A "server mode" or run coordinator eventually (even if v1 is CLI-first) so you can queue, resume, and observe runs centrally
+- A "server mode" or run coordinator eventually (even if v1 starts as a simple internal web app) so you can queue, resume, and observe runs centrally
 
 ## 1. Tech Stack Recommendations
 
@@ -108,7 +108,10 @@ If you plan to extend this beyond a single team to the whole agency, assume you 
 | Component | Recommendation | Rationale |
 |-----------|---------------|-----------|
 | **Language** | **Python 3.11+** | Best ecosystem for AI/ML, image processing, and CLI tools |
-| **CLI Framework** | **Typer** | Modern, type-hinted, generates great help text, async support |
+| **API Framework** | **FastAPI** | API-first architecture, easy to host internally, scales cleanly into a service |
+| **UI (v0)** | Server-rendered templates (FastAPI/Starlette) | Fastest path to a usable internal tool without frontend build overhead |
+| **UI (v1+)** | Next.js + TypeScript + canvas editor (Konva/Fabric) | Needed for real designer controls: layers, text editing, multi-ratio preview |
+| **CLI Wrapper** | Typer (optional) | Useful for automation/batch runs; can call the same orchestration code as the API |
 | **Config/Data** | **Pydantic v2** | Excellent for the Brand Style Profile schemas, validation, serialization |
 | **Project Structure** | **Dataclass + JSON** files | Spec already defines folder structure; keep it simple |
 
@@ -129,20 +132,14 @@ If you plan to extend this beyond a single team to the whole agency, assume you 
 | **Text detection** | EasyOCR or paddleocr (for KV quality gate) |
 | **Color analysis** | scikit-image or colorthief for palette compliance |
 
-### GUI (Internal Tool)
-
-| Component | Recommendation |
-|-----------|---------------|
-| **Framework** | **Streamlit** or **Gradio** | Spec says "basic internal GUI, not complicated" — these are fastest |
-| **Alternative** | FastAPI + simple React if you need more control |
-
 ### Storage & Caching
 
 | Component | Recommendation |
 |-----------|---------------|
-| **Asset storage** | Local filesystem (as per spec) |
-| **Caching** | diskcache or simple file-based hash caching |
-| **Metadata** | SQLite (optional) for indexing projects if you grow beyond file-based |
+| **Asset storage (v0)** | Local filesystem (as per spec) |
+| **Asset storage (scale)** | Object storage (S3/GCS) + CDN for serving |
+| **Caching** | File-based hash caching (v0), Redis (scale) |
+| **Metadata** | SQLite (v0) -> Postgres (scale) for indexing, auth, quotas, metrics |
 
 ---
 
@@ -155,14 +152,13 @@ performance_genai/
 ├── pyproject.toml
 ├── src/
 │   └── performance_genai/
-│       ├── cli/              # Typer commands (ads init, ads kv generate, etc.)
-│       ├── core/             # Project, Profile, KV, Copy, Master models (Pydantic)
-│       ├── providers/        # ImageProvider, LLMProvider abstractions
-│       ├── generation/       # KV generator, Copy generator
-│       ├── assembly/         # Master builder, template engine
-│       ├── quality/          # Palette checks, text detection gates
-│       └── gui/              # Streamlit app
-├── templates/            # Layout templates (JSON)
+│       ├── api/              # FastAPI app + templates (v0 UI)
+│       ├── cli/              # (Optional) Typer wrapper for batch/automation
+│       ├── providers/        # Gemini/OpenAI providers, capability flags
+│       ├── assembly/         # Deterministic renderer + (future) RenderSpec engine
+│       ├── quality/          # (Future) palette checks, text detection gates
+│       ├── storage.py        # File-based store + run manifests (v0)
+│       └── config.py         # Settings/env
 └── tests/
 ```
 
@@ -182,6 +178,11 @@ performance_genai/
 
 4. **Provider-agnostic architecture.** (Spec Section 5)
    - Image generation/editing sits behind an interface to support Gemini/Nano Banana (default), OpenAI image models, and others later
+
+5. **Layered composition for designer control.**
+   - Treat each creative as a set of layers (background, subject cutout, motif, logo, text).
+   - Generate multi-ratio previews deterministically from the same layer stack.
+   - Use AI only where it is uniquely good (background generation / optional outpaint), not for typography.
 
 ---
 
@@ -292,35 +293,60 @@ For a sample master builder and manifest shape, see `docs/sample_quickstart_code
 
 ## 5. Implementation Phases
 
-### Phase 1: Foundation (Week 1-2)
-- Project structure, CLI skeleton (`ads init`, `ads ingest`)
-- Pydantic models for Profile, Project, KV, Copy, Master
-- Provider abstraction with Gemini implementation
-- Basic file-based project storage
-- Run manifests + input hashing + optional `--job-id` plumbing (Spec 12.3)
-- `ads schema` JSON schema emission for core artifacts (Spec 12.3)
+### Phase 0: v0 Prototype (Already Built In This Repo)
 
-### Phase 2: Profile & KV (Week 3-4)
-- `ads profile propose` — multimodal LLM analysis of reference images
-- Profile review/edit flow
-- `ads kv explore` — style exploration (6-12 variants)
-- `ads kv generate` — full pool generation
-- Basic palette compliance checks
-- Implement Spec 7.5 "Nano Banana optimization" in the Gemini provider wrapper (multi-ref product fidelity, negative space protection layering, style anchoring)
+- FastAPI app + server-rendered web UI for projects and generation workflows
+- File-based project storage and run manifests (traceability)
+- Gemini provider:
+  - observed profile extraction from refs (vision)
+  - KV generation (text-free visuals)
+  - AI reframe/outpaint into target aspect ratios (ratio-specific visuals)
+- OpenAI provider: headline generation (v0)
+- Deterministic renderer (Pillow) for simple text/CTA overlays (useful, but likely not the long-term UX)
 
-### Phase 3: Copy & Assembly (Week 5-6)
-- `ads copy generate` — headlines, primary, CTAs
-- Assembly Engine interface + Pillow implementation (Spec 14.3)
-- Template system compiles to canonical RenderSpec (not just ad-hoc Pillow calls)
-- `ads masters build` — deterministic assembly
-- Export to 1:1, 4:5, 9:16
-- Add VaaJ pass/fail flagging and deterministic regeneration rules (Spec 10.6)
+### Phase 1: Stabilize The Visual Workflow (Immediate Internal Need)
 
-### Phase 4: GUI (Week 7-8)
-- Streamlit wrapper around CLI commands
-- Grid browsing for KVs
-- Profile editor with visual feedback
-- Master preview & shortlist
+- Make the core flow fast and obvious:
+  - Visual pool generation (n <= 5)
+  - shortlist selection
+  - batch "generate ratios" for shortlisted visuals
+- Reduce reframe drift where possible:
+  - stricter reframe constraints, locked-canvas outpaint bias
+  - optional motif enforcement (avoid motif invention)
+  - better prompts: "extend margins only" / "preserve subject"
+- Add basic safety and ops:
+  - upload validation (size/dimensions/type)
+  - internal-only security posture (reverse proxy auth, IP allowlist/VPN)
+  - usage monitoring from run manifests (counts, latency, approximate cost)
+
+### Phase 2: Layer Model + Designer Controls (Needed For Agency Rollout)
+
+- Introduce a canonical `RenderSpec` / layer model per creative:
+  - background image
+  - subject/product cutout (transparent PNG) + mask
+  - motif layer(s)
+  - logo layer
+  - text layers (headline, body, CTA)
+- Add subject isolation as a first-class operation (segmentation -> cutout):
+  - required for correct motif placement "behind subject"
+- Build a lightweight editor UI:
+  - Next.js + TypeScript + a canvas library (Konva/Fabric)
+  - live multi-ratio preview (1:1, 4:5, 9:16) while editing
+- Keep rendering deterministic:
+  - backend renders final exports from `RenderSpec`
+  - AI outpaint becomes optional only when background extension is needed for a ratio
+
+### Phase 3: Scale To Agency / SaaS (Control Plane + Infra)
+
+- Separate concerns:
+  - Python service = "creative engine" (generation, rendering, quality gates)
+  - Control plane (potentially your existing Laravel app) = auth/sessions, quotas, billing, org/team model
+- Add production primitives:
+  - Postgres for metadata + audit logs
+  - object storage for assets + signed URLs
+  - background jobs (Celery/RQ) + concurrency limits
+  - metrics + tracing + error reporting
+  - template/font registry and versioning (agency consistency)
 
 ---
 
@@ -349,111 +375,36 @@ For a sample master builder and manifest shape, see `docs/sample_quickstart_code
 
 ## 8. Summary
 
-**Go with Python + Typer + Pydantic + Streamlit.** The spec is well-designed for a file-based, CLI-first architecture with clear data models. The provider abstraction lets you start with Gemini (good multimodal support for profile extraction) and add OpenAI later.
+**Go with Python + FastAPI + Pydantic (creative engine).** Start with the existing server-rendered UI for v0/internal delivery, then add a real editor UI (Next.js + TypeScript + canvas) for agency-scale designer controls. A Typer CLI wrapper can come later for batch automation.
 
 | Component | Purpose |
 |-----------|---------|
 | **Provider Interface** | Lets you swap Gemini ↔ OpenAI without changing business logic. Abstracts image gen, editing, and LLM tasks. |
-| **Template Engine** | Turns KV+copy into 10-15 variants deterministically. JSON templates define text placement, scrims, safe areas. Compositor renders final images with Pillow. |
+| **RenderSpec + Assembly Engine** | Canonical layer/layout model that enables deterministic multi-ratio previews and exports, and a future interactive editor UI. |
+| **Control Plane (optional)** | Auth/sessions, quotas, budgets, billing, org/team model (can live in your existing Laravel app and call the Python engine). |
 
-Both are critical for the spec's goals of **provider-agnostic** and **deterministic master generation**.
-Both are critical for the spec's goals of **provider-agnostic** and **deterministic master generation**.
+These boundaries keep v0 fast while preserving a clean path to agency-scale rollout and monetization.
 
 ---
 
-## Updated thoughts - 3rdFeb - Agennt: Kimi
+## Appendix: Security + Scale Checklist (Before Wider Rollout)
 
-### Security Gaps Not Addressed
+### Security
 
-**1. API Key Handling**
-- Mentioned `settings.GEMINI_API_KEY` but no secure storage patterns specified
-- No key rotation, encryption at rest, or environment separation (dev/prod)
-- The `raw_metadata` field in `GeneratedImage` could leak sensitive provider responses
+- **API key handling**: keep keys in env/secrets manager; avoid persisting raw provider responses in artifacts/manifests.
+- **File upload safety**: validate file type, size, and dimensions; sanitize names; store outside any public web root.
+- **Auth**: for internal v0, run behind VPN/IP allowlist and reverse proxy auth; for agency scale, integrate SSO via the control plane.
+- **Prompt injection**: treat briefs and templates as untrusted input; restrict who can edit templates; escape/validate free-text inputs.
+- **Output safety**: optional moderation hook + audit log (who generated what, when, with which inputs).
 
-**2. File System Security**
-- Path traversal risks: User uploads could contain `../../../etc/passwd` style paths
-- No validation on file sizes, image dimensions, or malicious uploads (polyglot images)
-- Suggested local file storage without permission controls or access logging
+### Scalability / Reliability
 
-**3. Prompt Injection**
-- `brand_brief` data flows directly into LLM prompts without sanitization
-- No input validation on free-text fields (product names, objectives)
-- Template files (JSON) could be tampered with to inject malicious instructions
+- **File-based storage limits**: no indexing and weaker concurrency guarantees; plan a migration path to Postgres + object storage.
+- **Long-running jobs**: add a worker queue (Celery/RQ) before expanding usage or adding large batch runs.
+- **Rate limiting + cost controls**: implement budgets, circuit breakers, and backoff/retry policies to avoid runaway spend.
+- **Observability**: keep run manifests, but also add metrics/tracing/error reporting for production use.
 
-**4. Streamlit for Internal GUI**
-- Streamlit's default configuration has no authentication
-- "Internal use" assumptions can lead to exposed instances
-- No mention of session management or audit logging
+### Single Source Of Truth
 
-**5. Output Safety**
-- No content moderation hooks before saving generated KVs
-- Master manifests contain file paths that could expose directory structure
-
-### Scalability Issues
-
-**1. File-Based Architecture**
-- Spec requires CLI-first with file storage, but this has hard limits:
-  - No concurrent write safety (multiple CLI processes → corrupted manifests)
-  - No indexing → linear scans for finding projects/KVs as volume grows
-  - File system limitations on number of files per directory
-
-**2. Synchronous Processing**
-- PIL operations are CPU-bound and blocking
-- Generating "10-15 Masters per KV+copy pairing" × multiple KVs × multiple copies = potentially hundreds of images processed sequentially
-- No task queue or worker pool architecture suggested
-
-**3. Caching Strategy**
-- Suggested "file-based hash caching" but:
-  - Hash collisions possible with large image sets
-  - No eviction strategy → disk bloat
-  - Not shareable across multiple machines
-
-**4. Rate Limiting & Costs**
-- No circuit breakers for provider failures
-- Retry logic could amplify costs during outages
-- No cost tracking or budget controls per project
-
-### Remaining Duplicates / Sources of Truth Concerns
-
-**1. Profile Data Duplication**
-- `ObservedProfile` → `EnforcedProfile` versioning could lead to drift
-- Same style constraints exist in: Profile JSON, prompt templates, and KV metadata
-- If user updates Enforced Profile v1, existing KVs don't reflect the change
-
-**2. Template Logic Duplication**
-- Each template variant repeats ratio-specific dimensions
-- Platform specs (Meta safe areas, Google specs) duplicated in every template file
-- No central registry of "valid" template combinations
-
-**3. Validation Logic Duplication**
-- Palette compliance checks needed in: KV generation, quality gates, and master assembly
-- Text detection needed for KV gate AND potentially for master verification
-- Color adaptation ("auto" color) logic in compositor mirrors palette analysis logic
-
-**4. Reference Image Handling**
-- Reference images referenced by: Profile (anchor_refs), KV generation (reference_images), and Edit operations
-- No single source of truth for which images were actually used to generate a KV
-
-### Tensions with Spec
-
-**1. "Deterministic Masters" vs "Provider Agnostic"**
-- Spec says deterministic output given same inputs
-- But different providers (Gemini vs OpenAI) produce different KV images → different masters
-- The abstraction doesn't account for this non-determinism
-
-**2. "Scale through templating" vs File Storage**
-- Spec Section 3: "Scale through templating, not more prompting"
-- But file-based storage doesn't scale with template variants (imagine 1000 projects × 15 variants × 3 ratios)
-
-**3. "Text-free KVs" vs Mode A**
-- Spec Section 7.2: Mode A is "background replace... keep product intact"
-- But Gemini's `edit()` might introduce text artifacts during contextualization
-- The interface doesn't enforce the "no text in KVs" constraint at the type level
-
-### What Should Be Added
-
-1. **Security**: Input sanitization layer, signed URLs for assets, audit logging, API key management via secrets manager integration
-2. **Scalability**: SQLite/PostgreSQL for metadata with file storage for blobs, background job queue (Celery/RQ), streaming responses for long operations
-3. **Single Source of Truth**: Content-addressed storage (hash-based filenames), immutable profiles (enforced profiles are snapshots, not mutable), centralized validation rules
-
-The spec is well-designed for a single-user, single-machine workflow. The implementation suggestions follow that scope but don't flag where architectural decisions would break if the tool needs to grow beyond that.
+- Keep profiles/versioning, render specs, and references immutable once used for a run.
+- Prefer content-addressed assets (sha-based) once you move beyond v0 prototypes.

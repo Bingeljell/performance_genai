@@ -19,3 +19,9 @@
 - **2026-02-03 > src/performance_genai/api/app.py > bulk_delete_assets > add bulk-delete endpoint for deleting multiple assets at once**
 - **2026-02-03 > src/performance_genai/api/templates/project.html > n/a > add KV/master multi-select checkboxes and bulk delete buttons**
 - **2026-02-03 > docs/implementation_progress.md > n/a > document current prototype progress and propose next-step workflow simplification**
+- **2026-02-04 > README.md > n/a > refresh quickstart notes and docs pointers; reflect AI reframe workflow and internal-only security posture**
+- **2026-02-04 > docs/implementation_poa.md > n/a > update tech stack and phases (FastAPI-first, future editor, control plane integration) and add security/scale checklist**
+- **2026-02-04 > docs/implementation_progress.md > n/a > incorporate latest workflow direction and roadmap (subject isolation, multi-ratio preview, agency scale considerations)**
+- **2026-02-04 > src/performance_genai/storage.py > update_asset_metadata > add metadata update helper for asset shortlist flags**
+- **2026-02-04 > src/performance_genai/api/app.py > shortlist_kv, reframe_kv_batch, project_page > add shortlist flow, batch ratio generation, and visual pool grouping**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > refactor UI for visual pool, shortlist, batch ratio generation, and ratio outputs**

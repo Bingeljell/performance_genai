@@ -1,6 +1,6 @@
 # Implementation Progress (Prototype)
 
-Date: 2026-02-03
+Date: 2026-02-04
 
 This doc captures what has been built so far in the repo, what is working, what is intentionally rough, and the proposed next steps based on recent discussion.
 
@@ -121,9 +121,16 @@ If the tool uses AI reframe to generate final ratio-specific visuals, the curren
 - duplicates effort
 - is less useful than expected (especially when motif interaction matters)
 
+### 4) Missing "Designer Controls"
+
+To make this usable across an agency (and for motif-heavy brands), we will likely need:
+- subject isolation (cut out subject/product as a separate layer)
+- a simple editor for text/logo/motif placement
+- live multi-ratio previews while working (so users can validate adapts early)
+
 ---
 
-## Product Discussion Summary (Proposed Flow)
+## Product Discussion Summary (Current Direction)
 
 We discussed simplifying the experience and focusing on "master visual correctness" over deterministic text rendering.
 
@@ -134,7 +141,8 @@ Proposed flow:
 4) User shortlists selected options.
 5) User picks ratios for the shortlisted options.
 6) Tool generates ratio-specific visuals (AI reframe/outpaint) for each shortlisted option and each ratio.
-7) Text placement is manual (designer) in the short term, since it is easier than getting motif + subject interactions perfect with deterministic compositing.
+7) Text placement can be manual (designer) in the short term, since it is easier than getting motif + subject interactions perfect with deterministic compositing.
+8) Longer term, add a lightweight editor so users can place text/logo/motif and preview multiple ratios before export.
 
 Rationale:
 - AI reframe handles motif/subject interaction better than deterministic cropping.
@@ -143,9 +151,24 @@ Rationale:
 
 ---
 
+## Strategy Notes (Scaling Beyond One Team)
+
+We want v0 to solve an immediate internal need, but still be on a path to agency-scale usage.
+
+Recommended shape:
+- Keep this repo as the "creative engine" (Python/FastAPI + providers + rendering) for now.
+- If/when we productize, add a separate "control plane" (potentially your existing Laravel app) for:
+  - auth/session management
+  - quotas/budgets
+  - team/project permissions
+  - billing/usage reporting
+- Connect them via an internal API (Laravel -> Python engine) with service-to-service auth (API key/JWT) and audit logs.
+
+---
+
 ## Proposed Next Steps
 
-### A) UI + Workflow Simplification
+### A) Workflow Simplification (Shortlist -> Ratios)
 
 - Rename / refactor sections:
   - "KVs" -> "Visual Pool"
@@ -157,19 +180,37 @@ Rationale:
   - choose ratios (1:1, 4:5, 9:16, optionally 16:9)
   - choose image_size (1K/2K/4K)
 
-### B) Remove/Hide "Masters (Assembly)" For Now
+### B) Deprecate "Masters (Assembly)" In UI (For Now)
 
 - Either remove it from the UI or move it into an "Advanced" accordion.
 - Keep deterministic text assembly as a later phase when we want scale/repeatability.
 
-### C) Better Control for Motif When Asset Is Missing
+### C) Subject Isolation + Layering (Required For Motifs)
+
+- Add "Cut out subject/product" as a first-class operation:
+  - input: chosen KV
+  - output: transparent PNG subject layer + mask (stored as assets)
+- This unlocks correct stacking:
+  - background (AI-generated)
+  - motif behind subject
+  - subject layer on top
+  - text/logo layers on top
+
+### D) Multi-Ratio Preview While Working
+
+- While editing a visual, always show previews in a few key ratios (e.g. 1:1, 4:5, 9:16).
+- Implementation direction:
+  - deterministic render from a stored `render_spec.json` (layer model)
+  - optional AI outpaint pass only when background extension is needed
+
+### E) Better Control for Motif When Asset Is Missing
 
 - Add a guided "extract motif from reference image" workflow:
   - user selects a reference image
   - user selects a crop region
   - tool attempts to extract line-art mask and saves it as a motif asset
 
-### D) Strengthen Traceability
+### F) Strengthen Traceability
 
 - Ensure reframed visuals carry metadata:
   - source_kv_asset_id
@@ -195,4 +236,3 @@ From `src/performance_genai/api/app.py`:
 - `POST /projects/{project_id}/kvs/reframe`
 - `POST /projects/{project_id}/copy/headlines`
 - `POST /projects/{project_id}/masters/build`
-

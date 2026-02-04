@@ -58,7 +58,9 @@
         </div>
         <div class="row" style="align-items:center;">
           <span class="pill">refs: {{ (assets | selectattr('kind','equalto','reference') | list | length) }}</span>
-          <span class="pill">kvs: {{ kvs|length }}</span>
+          <span class="pill">visuals: {{ base_kvs|length }}</span>
+          <span class="pill">shortlisted: {{ shortlisted_kvs|length }}</span>
+          <span class="pill">ratios: {{ ratio_kvs|length }}</span>
           <span class="pill">masters: {{ masters|length }}</span>
           <form method="post" action="/projects/{{ project.project_id }}/delete" onsubmit="return confirm('Delete this project and all its assets?');">
             <button class="btn btn-danger" type="submit">Delete project</button>
@@ -100,7 +102,8 @@
           </div>
 
           <div class="panel">
-            <h2>Generate KVs (Image)</h2>
+            <h2>Generate Visual Pool</h2>
+            <div class="muted">Create a small set of base visuals (max 5) to shortlist.</div>
             <form method="post" action="/projects/{{ project.project_id }}/kvs/generate">
               <label>Prompt</label>
               <textarea name="prompt" required placeholder="e.g., lifestyle scene..."></textarea>
@@ -111,7 +114,7 @@
               <div class="row" style="margin-top:8px;">
                 <div>
                   <label>N</label>
-                  <input type="number" name="n" value="2" min="1" max="8" />
+                  <input type="number" name="n" value="3" min="1" max="5" />
                 </div>
                 <div>
                   <label>Aspect ratio</label>
@@ -127,35 +130,42 @@
           </div>
 
           <div class="panel">
-            <h2>AI Reframe KV (Text-Free Visuals)</h2>
-            <div class="muted">Uses the image model to generate ratio-specific visuals (keep subject + integrate motif) with no text. Good when deterministic cropping breaks brand motifs.</div>
-            <form method="post" action="/projects/{{ project.project_id }}/kvs/reframe">
-              <label>Base KV</label>
-              <select name="kv_asset_id" required>
-                {% for kv in kvs %}
-                  <option value="{{ kv.asset_id }}" {% if kv.asset_id == selected_kv %}selected{% endif %}>{{ kv.asset_id }} ({{ kv.filename }})</option>
-                {% endfor %}
-              </select>
-              <label>Motif (optional, transparent PNG)</label>
-              <select name="motif_asset_id">
-                <option value="">(none)</option>
-                {% for m in motifs %}
-                  <option value="{{ m.asset_id }}">{{ m.asset_id }} ({{ m.filename }})</option>
-                {% endfor %}
-              </select>
-              <div class="row" style="margin-top:8px;">
+            <h2>Generate Ratios (Shortlisted)</h2>
+            <div class="muted">Uses AI reframe/outpaint to create ratio-specific visuals from your shortlisted base images.</div>
+            <div class="muted" style="margin-top:6px;">Shortlisted: {{ shortlisted_kvs|length }}</div>
+            <form method="post" action="/projects/{{ project.project_id }}/kvs/reframe_batch">
+              <label>Target ratios</label>
+              <div class="row" style="margin-top:6px;">
                 <div>
-                  <label>Aspect ratio</label>
-                  <select name="aspect_ratio">
-                    <option value="1:1">1:1</option>
-                    <option value="4:5">4:5</option>
-                    <option value="9:16" selected>9:16</option>
-                    <option value="16:9">16:9</option>
-                    <option value="3:4">3:4</option>
-                    <option value="4:3">4:3</option>
-                    <option value="21:9">21:9</option>
-                  </select>
+                  <label style="display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" name="aspect_ratios" value="1:1" checked />
+                    1:1
+                  </label>
+                  <label style="display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" name="aspect_ratios" value="4:5" checked />
+                    4:5
+                  </label>
+                  <label style="display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" name="aspect_ratios" value="9:16" checked />
+                    9:16
+                  </label>
                 </div>
+                <div>
+                  <label style="display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" name="aspect_ratios" value="16:9" />
+                    16:9
+                  </label>
+                  <label style="display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" name="aspect_ratios" value="3:4" />
+                    3:4
+                  </label>
+                  <label style="display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" name="aspect_ratios" value="4:3" />
+                    4:3
+                  </label>
+                </div>
+              </div>
+              <div class="row" style="margin-top:8px;">
                 <div>
                   <label>Image size</label>
                   <select name="image_size">
@@ -164,19 +174,23 @@
                     <option value="4K">4K</option>
                   </select>
                 </div>
-              </div>
-              <div class="row" style="margin-top:8px;">
                 <div>
-                  <label>N</label>
-                  <input type="number" name="n" value="1" min="1" max="4" />
+                  <label>N per ratio</label>
+                  <input type="number" name="n_per_ratio" value="1" min="1" max="3" />
                 </div>
-                <div></div>
               </div>
+              <label>Motif (optional, transparent PNG)</label>
+              <select name="motif_asset_id">
+                <option value="">(none)</option>
+                {% for m in motifs %}
+                  <option value="{{ m.asset_id }}">{{ m.asset_id }} ({{ m.filename }})</option>
+                {% endfor %}
+              </select>
               <label>Instruction (optional)</label>
               <textarea name="prompt">Return the SAME image, just expanded to the target aspect ratio by outpainting ONLY the new canvas areas. Do NOT change the existing pixels/subject identity. No text, no logos, no watermarks.</textarea>
-              <button class="btn" type="submit" style="margin-top:10px;">AI reframe</button>
-              {% if not kvs %}
-                <p class="muted" style="margin-top:10px;">Generate a KV first.</p>
+              <button class="btn" type="submit" style="margin-top:10px;">Generate ratios</button>
+              {% if not shortlisted_kvs %}
+                <p class="muted" style="margin-top:10px;">Shortlist at least one visual below.</p>
               {% endif %}
             </form>
           </div>
@@ -197,8 +211,8 @@
           </div>
 
           <div class="panel">
-            <h2>Masters (Assembly)</h2>
-            <div class="muted">Deterministic overlay of headline + CTA. Use motif once you have it.</div>
+            <h2>Masters (Advanced)</h2>
+            <div class="muted">Optional deterministic overlay of headline + CTA. Keep for later if you will place text manually.</div>
             <form method="post" action="/projects/{{ project.project_id }}/masters/build">
               <label>KV</label>
               <select name="kv_asset_id" required>
@@ -288,8 +302,8 @@
           </div>
 
           <div class="panel">
-            <h2>KVs</h2>
-            {% if kvs %}
+            <h2>Visual Pool</h2>
+            {% if base_kvs %}
               <div class="k" style="margin-bottom:10px;">
                 <small class="muted">Bulk actions</small>
                 <div style="display:flex; gap:8px; align-items:center;">
@@ -301,7 +315,7 @@
                 </div>
               </div>
               <div class="grid">
-                {% for a in kvs %}
+                {% for a in base_kvs %}
                   <div class="item">
                     <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
                     <div class="k">
@@ -313,7 +327,13 @@
                     </div>
                     <div class="k">
                       <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                      <a class="muted" href="/projects/{{ project.project_id }}?kv={{ a.asset_id }}">use for masters</a>
+                      {% if a.metadata.get('shortlisted') %}
+                        <small class="pill">shortlisted</small>
+                      {% endif %}
+                      <form method="post" action="/projects/{{ project.project_id }}/kvs/{{ a.asset_id }}/shortlist">
+                        <input type="hidden" name="shortlisted" value="{% if a.metadata.get('shortlisted') %}0{% else %}1{% endif %}" />
+                        <button class="btn" type="submit">{% if a.metadata.get('shortlisted') %}Remove{% else %}Shortlist{% endif %}</button>
+                      </form>
                       <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this KV?');">
                         <button class="btn" type="submit">Delete</button>
                       </form>
@@ -322,12 +342,79 @@
                 {% endfor %}
               </div>
             {% else %}
-              <p class="muted">No KVs yet.</p>
+              <p class="muted">No visuals yet.</p>
             {% endif %}
           </div>
 
           <div class="panel">
-            <h2>Masters</h2>
+            <h2>Shortlisted</h2>
+            {% if shortlisted_kvs %}
+              <div class="grid">
+                {% for a in shortlisted_kvs %}
+                  <div class="item">
+                    <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
+                    <div class="k">
+                      <small>kv</small>
+                      <small><code>{{ a.asset_id }}</code></small>
+                    </div>
+                    <div class="k">
+                      <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                      <form method="post" action="/projects/{{ project.project_id }}/kvs/{{ a.asset_id }}/shortlist">
+                        <input type="hidden" name="shortlisted" value="0" />
+                        <button class="btn" type="submit">Remove</button>
+                      </form>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No shortlisted visuals yet.</p>
+            {% endif %}
+          </div>
+
+          <div class="panel">
+            <h2>Ratio Outputs</h2>
+            {% if ratio_kvs %}
+              <div class="k" style="margin-bottom:10px;">
+                <small class="muted">Bulk actions</small>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <button class="btn" type="button" onclick="toggleAll('ratio', true)">Select all</button>
+                  <button class="btn" type="button" onclick="toggleAll('ratio', false)">Clear</button>
+                  <form id="bulk_ratio_delete" method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete" onsubmit="return confirm('Delete selected ratio outputs?');">
+                    <button class="btn btn-danger" type="submit">Delete selected</button>
+                  </form>
+                </div>
+              </div>
+              <div class="grid">
+                {% for a in ratio_kvs %}
+                  <div class="item">
+                    <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
+                    <div class="k">
+                      <small>
+                        <input data-bulk="ratio" type="checkbox" name="asset_ids" value="{{ a.asset_id }}" form="bulk_ratio_delete" />
+                        {{ a.metadata.get('aspect_ratio', 'ratio') }}
+                      </small>
+                      <small><code>{{ a.asset_id }}</code></small>
+                    </div>
+                    <div class="k">
+                      <small class="muted">from {{ a.metadata.get('source_kv_asset_id', 'kv') }}</small>
+                    </div>
+                    <div class="k">
+                      <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                      <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this output?');">
+                        <button class="btn" type="submit">Delete</button>
+                      </form>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">No ratio outputs yet.</p>
+            {% endif %}
+          </div>
+
+          <div class="panel">
+            <h2>Masters (Advanced)</h2>
             {% if masters %}
               <div class="k" style="margin-bottom:10px;">
                 <small class="muted">Bulk actions</small>
