@@ -25,3 +25,52 @@
 - **2026-02-04 > src/performance_genai/storage.py > update_asset_metadata > add metadata update helper for asset shortlist flags**
 - **2026-02-04 > src/performance_genai/api/app.py > shortlist_kv, reframe_kv_batch, project_page > add shortlist flow, batch ratio generation, and visual pool grouping**
 - **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > refactor UI for visual pool, shortlist, batch ratio generation, and ratio outputs**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > remove Masters panel and summary pill to simplify UI**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout, _load_font > add deterministic text preview renderer with font selection and normalized boxes**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout, generate_kvs, reframe_kv_batch > add text preview endpoint and human-readable KV labels**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > add text preview gallery; show display names for visuals**
+- **2026-02-04 > src/performance_genai/storage.py > create_project > add layouts and text_previews directories**
+- **2026-02-04 > src/performance_genai/api/app.py > editor_page, preview_text_layout > add Fabric editor route and allow returning to editor after preview**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add Fabric editor UI for text placement**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > implement Fabric canvas interactions, text sync, and preview submission**
+- **2026-02-04 > src/performance_genai/api/app.py > editor_page > include all KV assets in editor selection**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > improve background image loading robustness**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > enforce valid canvas textBaseline to avoid Fabric render error**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > normalize canvas textBaseline setter to map invalid "alphabetical" to "alphabetic"**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > pin Fabric CDN to 4.6.0 and cache-bust editor.js**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > add dynamic Fabric loader and init guard to avoid "fabric is not defined"**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > add multi-CDN fallback loader for Fabric**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > remove direct Fabric script tag and bump editor.js cache buster**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > add editor link and remove legacy text placement form**
+- **2026-02-04 > docs/implementation_progress.md > n/a > document Brand/Campaign/Ad Set -> Masters -> Adapts structure and revised editor-first workflow**
+- **2026-02-04 > src/performance_genai/storage.py > Project, create_project, read_project > add brand_name/campaign_name metadata fields for Ad Set grouping**
+- **2026-02-04 > src/performance_genai/api/app.py > index, create_project > group Ad Sets by brand/campaign and extend create form inputs**
+- **2026-02-04 > src/performance_genai/api/templates/index.html > n/a > rename projects to ad sets and add brand/campaign fields + grouped listing**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > simplify Ad Set page to upload + 1:1 visual pool + shortlist + editor link**
+- **2026-02-04 > src/performance_genai/providers/openai_provider.py > generate_copy_sets > add headline+subhead+CTA copy set generation for editor**
+- **2026-02-04 > src/performance_genai/api/app.py > generate_copy_sets, editor_page > add copy set endpoint and load copy_sets/text_previews in editor**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add copy set generation/apply UI and show recent preview thumbnails**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > support applying copy sets into Fabric text boxes**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout > reduce scrim opacity and improve font sizing with font_scale**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > accept font_scale for preview rendering**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add font scale control and show full-size ratio previews**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > wire font scale control into Fabric text boxes and preview form**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout > remove scrim overlays from previews**
+- **2026-02-04 > src/performance_genai/api/app.py > delete_asset > allow return_to redirect for editor deletes**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add delete buttons for previews and persist editor state**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > persist editor state in localStorage and restore after preview**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add debug console area for editor diagnostics**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > log image fetch/load diagnostics for editor background issues**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > load KV images as Fabric objects to avoid blank background rendering**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v4**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > use HTML image as background under Fabric canvas and bump cache buster to v5**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > set background image via <img> and sync canvas size**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > make canvas background transparent so KV image is visible**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > force canvas and image CSS sizes to match and log dimensions**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v6**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > position Fabric wrapper absolutely over background image to avoid double-height canvas**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > remove inline canvas absolute styles and bump cache buster to v7**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > switch editor to text-layer model, add insert-text and copy-set insertion logic, and scale fonts across all text boxes**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > remove legacy headline/subhead/cta preview fields and bump editor.js cache buster to v11**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > accept text_layers payloads and route previews through layered renderer**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers > render editor text layers at fixed font sizes without scrim**

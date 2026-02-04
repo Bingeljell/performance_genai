@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ project.name }} — Editor</title>
+    <style>
+      :root {
+        --bg: #0f1a16;
+        --panel: rgba(255,255,255,0.06);
+        --stroke: rgba(255,255,255,0.12);
+        --text: rgba(255,255,255,0.94);
+        --muted: rgba(255,255,255,0.70);
+        --link: #8fe4c7;
+        --shadow: rgba(0,0,0,0.35);
+      }
+      body { background: radial-gradient(1200px 700px at 15% 0%, rgba(143,228,199,0.14), transparent 60%), var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Arial; margin: 0; }
+      a { color: var(--link); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 30px; }
+      .topbar { display:flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 14px; background: var(--panel); box-shadow: 0 12px 30px var(--shadow); }
+      .title { display:flex; flex-direction: column; gap: 2px; }
+      .title h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
+      .title .meta { color: var(--muted); font-size: 12px; }
+      .btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); color: var(--text); cursor: pointer; }
+      .btn:hover { background: rgba(255,255,255,0.10); }
+      .layout { display:grid; grid-template-columns: 360px 1fr; gap: 14px; margin-top: 14px; }
+      @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+      .panel { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: var(--panel); box-shadow: 0 10px 24px var(--shadow); }
+      .panel h2 { font-size: 14px; margin: 0 0 10px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86); }
+      label { display:block; font-size: 12px; color: var(--muted); margin-top: 8px; }
+      textarea { width: 100%; min-height: 70px; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.22); color: var(--text); }
+      input[type=text], select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.22); color: var(--text); }
+      .muted { color: var(--muted); font-size: 12px; }
+      .canvas-wrap { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: rgba(0,0,0,0.20); }
+      .canvas-toolbar { display:flex; gap: 8px; align-items:center; margin-bottom: 10px; flex-wrap: wrap; }
+      canvas { border-radius: 10px; background: transparent; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+      .thumb { width: 100%; height: auto; object-fit: contain; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.22); }
+      .item { border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; padding: 10px; background: rgba(0,0,0,0.20); }
+      .k { display:flex; justify-content: space-between; gap: 8px; margin-top: 8px; align-items: center; }
+    </style>
+  </head>
+  <body data-project-id="{{ project.project_id }}">
+    <div class="wrap">
+      <div class="topbar">
+        <div class="title">
+          <div class="muted"><a href="/projects/{{ project.project_id }}">&lt;- back to project</a></div>
+          <h1>{{ project.name }} — Editor</h1>
+          <div class="meta">
+            {% if project.brand_name %}Brand: <code>{{ project.brand_name }}</code>{% endif %}
+            {% if project.campaign_name %} Campaign: <code>{{ project.campaign_name }}</code>{% endif %}
+            &nbsp; Ad set ID: <code>{{ project.project_id }}</code>
+          </div>
+        </div>
+        <div class="muted">Text placement (Fabric)</div>
+      </div>
+
+      <div class="layout">
+        <div class="panel">
+          <h2>Text Controls</h2>
+          <label>Base visual</label>
+          <select id="kv-select">
+            {% for kv in kv_choices %}
+              <option value="{{ kv.id }}" {% if kv.id == selected_kv %}selected{% endif %}>{{ kv.label }}</option>
+            {% endfor %}
+          </select>
+          {% if not kv_choices %}
+            <p class="muted" style="margin-top:10px;">No visuals yet. Generate a visual pool first.</p>
+          {% endif %}
+
+          <label>Guide ratio</label>
+          <select id="guide-select">
+            <option value="1:1">1:1 (square)</option>
+            <option value="4:5">4:5 (portrait)</option>
+            <option value="9:16">9:16 (story)</option>
+          </select>
+          <div class="muted" style="margin-top:6px;">Dashed frame shows the publishable area. Anything outside is outpaint zone.</div>
+
+          <button class="btn" id="btn-insert-text" type="button" style="margin-top:8px;">Insert text box</button>
+
+          <label>Font</label>
+          <select id="font-select">
+            <option value="dejavu">DejaVu Sans</option>
+            <option value="helvetica">Helvetica</option>
+            <option value="arial">Arial</option>
+          </select>
+
+          <label>Text color</label>
+          <input type="text" id="color-input" value="#ffffff" />
+
+          <label>Font scale</label>
+          <input type="range" id="font-scale" min="0.6" max="1.6" step="0.05" value="1.0" />
+          <div class="muted" id="font-scale-value" style="margin-top:4px;">1.00x</div>
+
+          <label>Align</label>
+          <select id="align-select">
+            <option value="left">left</option>
+            <option value="center">center</option>
+          </select>
+
+          <div class="muted" style="margin-top:10px;">Drag and resize text boxes on the canvas. Use handles to scale.</div>
+          <button class="btn" id="btn-preview" type="button" style="margin-top:10px;">Generate previews (1:1, 4:5, 9:16)</button>
+
+          <div style="margin-top:16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.10);">
+            <div style="font-size: 14px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86);">Copy Sets</div>
+            <div class="muted" style="margin-top:6px;">Generate headline + subhead + CTA sets and apply them to the canvas.</div>
+            <form method="post" action="/projects/{{ project.project_id }}/copy/sets">
+              <label>Brief</label>
+              <textarea name="brief_text" required placeholder="Product, offer, objective, constraints..."></textarea>
+              <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                <input type="checkbox" name="use_images" value="true" />
+                Use uploaded images as reference
+              </label>
+              <label>Count</label>
+              <input type="text" name="count" value="8" />
+              <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+              <button class="btn" type="submit" style="margin-top:10px;">Generate copy sets</button>
+            </form>
+
+            {% if copy_sets %}
+              <div class="grid">
+                {% for s in copy_sets %}
+                  <div class="item">
+                    <div class="muted" style="font-size:11px;">headline</div>
+                    <div style="margin-top:4px;">{{ s.headline }}</div>
+                    <div class="muted" style="font-size:11px; margin-top:8px;">subhead</div>
+                    <div style="margin-top:4px;">{{ s.subhead }}</div>
+                    <div class="muted" style="font-size:11px; margin-top:8px;">cta</div>
+                    <div style="margin-top:4px;">{{ s.cta }}</div>
+                    <div class="k">
+                      <button
+                        class="btn use-copy-set"
+                        type="button"
+                        data-headline="{{ s.headline|e }}"
+                        data-subhead="{{ s.subhead|e }}"
+                        data-cta="{{ s.cta|e }}"
+                      >
+                        Insert set
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="muted" style="margin-top:10px;">No copy sets yet.</div>
+            {% endif %}
+          </div>
+
+          <form id="preview-form" method="post" action="/projects/{{ project.project_id }}/layouts/preview">
+            <input type="hidden" name="kv_asset_id" id="form-kv" />
+            <input type="hidden" name="text_layers" id="form-text-layers" />
+            <input type="hidden" name="font_family" id="form-font" />
+            <input type="hidden" name="text_color" id="form-color" />
+            <input type="hidden" name="text_align" id="form-align" />
+            <input type="hidden" name="font_scale" id="form-font-scale" />
+            <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+          </form>
+        </div>
+
+          <div class="panel">
+            <h2>Canvas</h2>
+            <div class="canvas-wrap">
+              <div class="canvas-toolbar">
+                <span class="muted" id="kv-label">No visual selected</span>
+              </div>
+              <div id="canvas-stage" style="position: relative; display: inline-block;">
+                <img id="kv-bg" alt="kv background" style="display:block; max-width: 900px; border-radius: 10px;" />
+                <canvas id="editor-canvas" width="900" height="900"></canvas>
+              </div>
+            </div>
+            <details style="margin-top:10px;">
+              <summary class="muted">Debug</summary>
+              <pre id="debug-log" style="white-space: pre-wrap; font-size: 12px; color: rgba(255,255,255,0.82);"></pre>
+            </details>
+
+            {% if text_previews %}
+              <div style="margin-top:14px;">
+                <div class="muted">Recent text previews</div>
+                <div class="grid">
+                  {% for a in text_previews[:9] %}
+                    <div class="item">
+                      <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
+                      <div class="k">
+                        <small class="muted">{{ a.metadata.ratio }}</small>
+                        <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                      </div>
+                      <div class="k">
+                        <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this preview?');">
+                          <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                          <button class="btn" type="submit">Delete</button>
+                        </form>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+      </div>
+    </div>
+
+    <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
+    <script src="/static/editor.js?v=11"></script>
+  </body>
+</html>

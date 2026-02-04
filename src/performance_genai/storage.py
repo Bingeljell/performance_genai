@@ -45,6 +45,8 @@ class Asset:
 class Project:
     project_id: str
     name: str
+    brand_name: str | None
+    campaign_name: str | None
     created_at: str
     assets: list[Asset]
     observed_profile: dict[str, Any] | None
@@ -56,7 +58,7 @@ class ProjectStore:
         self.projects_dir = self.root_dir / "projects"
         self.projects_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_project(self, name: str) -> Project:
+    def create_project(self, name: str, brand_name: str | None = None, campaign_name: str | None = None) -> Project:
         project_id = uuid.uuid4().hex[:12]
         proj_dir = self.projects_dir / project_id
         (proj_dir / "assets").mkdir(parents=True, exist_ok=True)
@@ -64,11 +66,15 @@ class ProjectStore:
         (proj_dir / "profiles").mkdir(parents=True, exist_ok=True)
         (proj_dir / "kvs").mkdir(parents=True, exist_ok=True)
         (proj_dir / "masters").mkdir(parents=True, exist_ok=True)
+        (proj_dir / "layouts").mkdir(parents=True, exist_ok=True)
+        (proj_dir / "text_previews").mkdir(parents=True, exist_ok=True)
         (proj_dir / "runs").mkdir(parents=True, exist_ok=True)
 
         proj = Project(
             project_id=project_id,
             name=name,
+            brand_name=(brand_name or "").strip() or None,
+            campaign_name=(campaign_name or "").strip() or None,
             created_at=_now_iso(),
             assets=[],
             observed_profile=None,
@@ -95,6 +101,8 @@ class ProjectStore:
         return Project(
             project_id=data["project_id"],
             name=data["name"],
+            brand_name=data.get("brand_name"),
+            campaign_name=data.get("campaign_name"),
             created_at=data["created_at"],
             assets=assets,
             observed_profile=data.get("observed_profile"),

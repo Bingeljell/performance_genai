@@ -35,31 +35,47 @@
     <div class="wrap">
       <div class="top">
         <h1>performance_genai</h1>
-        <div class="muted">Prototype UI for KV generation + deterministic masters.</div>
+        <div class="muted">Internal prototype: generate 1:1 master visuals, then use the editor for layout and adapts.</div>
       </div>
       <div class="row">
         <div class="card">
-          <h2 style="margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:0.3px;">Create project</h2>
+          <h2 style="margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:0.3px;">Create ad set</h2>
           <form method="post" action="/projects">
-            <input type="text" name="name" placeholder="Project name" required />
+            <input type="text" name="brand_name" placeholder="Brand (optional)" />
+            <div style="margin-top: 10px;">
+              <input type="text" name="campaign_name" placeholder="Campaign (optional)" />
+            </div>
+            <div style="margin-top: 10px;">
+              <input type="text" name="name" placeholder="Ad set name" required />
+            </div>
             <div style="margin-top: 10px;">
               <button type="submit">Create</button>
             </div>
           </form>
         </div>
         <div class="card">
-          <h2 style="margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:0.3px;">Projects</h2>
+          <h2 style="margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:0.3px;">Ad sets</h2>
           {% if projects %}
-            <ul>
-              {% for p in projects %}
-                <li>
-                  <a href="/projects/{{ p.project_id }}">{{ p.name }}</a>
-                  <span class="muted">(created {{ p.created_at }})</span>
-                </li>
-              {% endfor %}
-            </ul>
+            {% for brand, campaigns in grouped.items() %}
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 13px; font-weight: 600;">{{ brand }}</div>
+                <div style="margin-top: 6px;">
+                  {% for campaign, items in campaigns.items() %}
+                    <div class="muted" style="margin: 6px 0 4px;">{{ campaign }}</div>
+                    <ul>
+                      {% for p in items %}
+                        <li>
+                          <a href="/projects/{{ p.project_id }}">{{ p.name }}</a>
+                          <span class="muted">(created {{ p.created_at }})</span>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
           {% else %}
-            <p class="muted">No projects yet.</p>
+            <p class="muted">No ad sets yet.</p>
           {% endif %}
         </div>
       </div>

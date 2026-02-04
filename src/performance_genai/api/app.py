@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
 
-from performance_genai.assembly.render import render_master_simple
+from performance_genai.assembly.render import render_master_simple, render_text_layout, render_text_layers
 from performance_genai.config import settings
 from performance_genai.providers.gemini_provider import GeminiProvider
 from performance_genai.providers.openai_provider import OpenAITextProvider
@@ -48,6 +48,39 @@ def _parse_bool(value: str | None) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _parse_float(value: str | None, default: float) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _parse_box_from_form(
+    x: str | None,
+    y: str | None,
+    w: str | None,
+    h: str | None,
+    default: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    return (
+        _parse_float(x, default[0]),
+        _parse_float(y, default[1]),
+        _parse_float(w, default[2]),
+        _parse_float(h, default[3]),
+    )
+
+
+def _safe_return_path(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if cleaned.startswith("/projects/") and ".." not in cleaned:
+        return cleaned
+    return None
+
+
 def _build_reframe_constraints(has_motif: bool) -> str:
     constraints = (
         "OUTPUT MUST CONTAIN NO TEXT, NO LOGOS, NO WATERMARKS.\n"
@@ -67,16 +100,21 @@ def _build_reframe_constraints(has_motif: bool) -> str:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     projects = store.list_projects()
+    grouped: dict[str, dict[str, list[Any]]] = {}
+    for p in projects:
+        brand = (p.brand_name or "").strip() or "Unassigned"
+        campaign = (p.campaign_name or "").strip() or "Unassigned"
+        grouped.setdefault(brand, {}).setdefault(campaign, []).append(p)
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"projects": projects},
+        context={"projects": projects, "grouped": grouped},
     )
 
 
 @app.post("/projects")
-def create_project(name: str = Form(...)):
-    proj = store.create_project(name=name)
+def create_project(name: str = Form(...), brand_name: str = Form(""), campaign_name: str = Form("")):
+    proj = store.create_project(name=name, brand_name=brand_name, campaign_name=campaign_name)
     return RedirectResponse(url=f"/projects/{proj.project_id}", status_code=303)
 
 
@@ -88,6 +126,7 @@ def project_page(request: Request, project_id: str):
     base_kvs = [a for a in kvs if not (a.metadata or {}).get("source_kv_asset_id")]
     ratio_kvs = [a for a in kvs if (a.metadata or {}).get("source_kv_asset_id")]
     shortlisted_kvs = [a for a in base_kvs if (a.metadata or {}).get("shortlisted")]
+    text_previews = [a for a in assets if a.kind == "text_preview"]
     masters = [a for a in assets if a.kind == "master"]
     motifs = [a for a in assets if a.kind == "motif"]
     selected_kv = request.query_params.get("kv") or ""
@@ -123,6 +162,7 @@ def project_page(request: Request, project_id: str):
             "base_kvs": base_kvs,
             "ratio_kvs": ratio_kvs,
             "shortlisted_kvs": shortlisted_kvs,
+            "text_previews": text_previews,
             "masters": masters,
             "motifs": motifs,
             "observed_profile": proj.observed_profile,
@@ -130,6 +170,46 @@ def project_page(request: Request, project_id: str):
             "headlines": headlines,
             "selected_kv": selected_kv,
             "selected_headline": selected_headline,
+        },
+    )
+
+
+@app.get("/projects/{project_id}/editor", response_class=HTMLResponse)
+def editor_page(request: Request, project_id: str):
+    proj = store.read_project(project_id)
+    assets = list(reversed(proj.assets))
+    kvs = [a for a in assets if a.kind == "kv"]
+    base_kvs = [a for a in kvs if not (a.metadata or {}).get("source_kv_asset_id")]
+    kv_choices = [
+        {
+            "id": a.asset_id,
+            "label": (a.metadata or {}).get("display_name") or a.filename,
+            "url": f"/projects/{project_id}/assets/{a.asset_id}",
+        }
+        for a in base_kvs
+    ]
+    selected_kv = request.query_params.get("kv") or ""
+
+    copy_sets: list[dict[str, str]] = []
+    try:
+        proj_dir = Path(settings.data_dir) / "projects" / project_id
+        cs_path = proj_dir / "copy_sets.json"
+        if cs_path.exists():
+            copy_sets = json.loads(cs_path.read_text("utf-8")).get("sets", []) or []
+    except Exception:
+        copy_sets = []
+
+    text_previews = [a for a in assets if a.kind == "text_preview"]
+    return templates.TemplateResponse(
+        request=request,
+        name="editor.html",
+        context={
+            "project": proj,
+            "kv_choices_json": json.dumps(kv_choices),
+            "kv_choices": kv_choices,
+            "selected_kv": selected_kv,
+            "copy_sets": copy_sets,
+            "text_previews": text_previews,
         },
     )
 
@@ -161,9 +241,10 @@ def delete_project(project_id: str):
 
 
 @app.post("/projects/{project_id}/assets/{asset_id}/delete")
-def delete_asset(project_id: str, asset_id: str):
+def delete_asset(project_id: str, asset_id: str, return_to: str = Form("")):
     store.delete_asset(project_id, asset_id)
-    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
+    return RedirectResponse(url=redirect_path, status_code=303)
 
 
 @app.post("/projects/{project_id}/kvs/{asset_id}/shortlist")
@@ -241,14 +322,22 @@ async def generate_kvs(
     images = await gemini.generate(prompt=prompt, reference_images=ref_paths[:8], n=int(n), aspect_ratio=aspect_ratio)
 
     kv_asset_ids: list[str] = []
+    existing_base = [a for a in proj.assets if a.kind == "kv" and not (a.metadata or {}).get("source_kv_asset_id")]
+    base_start = len(existing_base)
     for idx, gi in enumerate(images):
+        label = f"kv_option_{base_start + idx + 1}"
         buf = _pil_to_png_bytes(gi.image)
         asset = store.add_asset(
             project_id=project_id,
             kind="kv",
-            filename=f"kv_{idx}.png",
+            filename=f"{label}.png",
             content=buf,
-            metadata={"provider": gi.provider, "model": gi.model, "prompt": gi.prompt_used},
+            metadata={
+                "provider": gi.provider,
+                "model": gi.model,
+                "prompt": gi.prompt_used,
+                "display_name": label,
+            },
             subdir="kvs",
         )
         kv_asset_ids.append(asset.asset_id)
@@ -304,6 +393,8 @@ async def reframe_kv(
 
     kv_asset_ids: list[str] = []
     for idx, gi in enumerate(images):
+        source_label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename
+        display_label = f"{source_label}_{aspect_ratio}_{idx + 1}"
         buf = _pil_to_png_bytes(gi.image)
         asset = store.add_asset(
             project_id=project_id,
@@ -318,6 +409,7 @@ async def reframe_kv(
                 "motif_asset_id": motif_asset_id or None,
                 "aspect_ratio": aspect_ratio,
                 "image_size": image_size,
+                "display_name": display_label,
             },
             subdir="kvs",
         )
@@ -375,6 +467,7 @@ async def reframe_kv_batch(
 
     for kv in shortlisted:
         kv_path = store.abs_asset_path(project_id, kv)
+        source_label = (kv.metadata or {}).get("display_name") or kv.filename
         for ratio in aspect_ratios:
             images = await gemini.reframe_kv_with_motif(
                 kv_image=kv_path,
@@ -388,6 +481,7 @@ async def reframe_kv_batch(
             for idx, gi in enumerate(images):
                 buf = _pil_to_png_bytes(gi.image)
                 safe_ratio = ratio.replace(":", "x")
+                display_label = f"{source_label}_{ratio}_{idx + 1}"
                 asset = store.add_asset(
                     project_id=project_id,
                     kind="kv",
@@ -402,6 +496,7 @@ async def reframe_kv_batch(
                         "aspect_ratio": ratio,
                         "image_size": image_size,
                         "batch_id": batch_id,
+                        "display_name": display_label,
                     },
                     subdir="kvs",
                 )
@@ -433,6 +528,157 @@ async def reframe_kv_batch(
         },
     )
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@app.post("/projects/{project_id}/layouts/preview")
+async def preview_text_layout(
+    project_id: str,
+    kv_asset_id: str = Form(...),
+    text_layers: str = Form(""),
+    headline: str = Form(""),
+    subhead: str = Form(""),
+    cta: str = Form("Learn more"),
+    font_family: str = Form("dejavu"),
+    text_color: str = Form("#ffffff"),
+    text_align: str = Form("left"),
+    font_scale: float = Form(1.0),
+    headline_x: str = Form("0.06"),
+    headline_y: str = Form("0.60"),
+    headline_w: str = Form("0.88"),
+    headline_h: str = Form("0.16"),
+    subhead_x: str = Form("0.06"),
+    subhead_y: str = Form("0.76"),
+    subhead_w: str = Form("0.88"),
+    subhead_h: str = Form("0.08"),
+    cta_x: str = Form("0.06"),
+    cta_y: str = Form("0.86"),
+    cta_w: str = Form("0.50"),
+    cta_h: str = Form("0.10"),
+    return_to: str = Form(""),
+):
+    proj = store.read_project(project_id)
+    kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
+    if not kv_asset:
+        raise HTTPException(status_code=400, detail="kv_asset_id must be an existing KV asset")
+
+    kv_path = store.abs_asset_path(project_id, kv_asset)
+    kv_img = Image.open(kv_path)
+
+    layout_id = uuid.uuid4().hex[:12]
+    use_layers = False
+    layers_payload: list[dict] = []
+    if text_layers.strip():
+        try:
+            parsed = json.loads(text_layers)
+            if isinstance(parsed, list):
+                use_layers = True
+                layers_payload = parsed
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"text_layers must be JSON list: {exc}") from exc
+
+    headline_box = _parse_box_from_form(headline_x, headline_y, headline_w, headline_h, (0.06, 0.60, 0.88, 0.16))
+    subhead_box = _parse_box_from_form(subhead_x, subhead_y, subhead_w, subhead_h, (0.06, 0.76, 0.88, 0.08))
+    cta_box = _parse_box_from_form(cta_x, cta_y, cta_w, cta_h, (0.06, 0.86, 0.50, 0.10))
+
+    if use_layers:
+        layout = {
+            "layout_id": layout_id,
+            "kv_asset_id": kv_asset_id,
+            "font_family": font_family,
+            "text_color": text_color,
+            "text_align": text_align,
+            "text_layers": layers_payload,
+        }
+    else:
+        layout = {
+            "layout_id": layout_id,
+            "kv_asset_id": kv_asset_id,
+            "headline": headline,
+            "subhead": subhead,
+            "cta": cta,
+            "font_family": font_family,
+            "text_color": text_color,
+            "text_align": text_align,
+            "headline_box": headline_box,
+            "subhead_box": subhead_box,
+            "cta_box": cta_box,
+        }
+
+    proj_dir = Path(settings.data_dir) / "projects" / project_id
+    layouts_dir = proj_dir / "layouts"
+    layouts_dir.mkdir(parents=True, exist_ok=True)
+    (layouts_dir / f"layout_{layout_id}.json").write_text(json.dumps(layout, indent=2), "utf-8")
+
+    preview_ids: list[str] = []
+    for ratio in ("1:1", "4:5", "9:16"):
+        size = settings.master_sizes.get(ratio)
+        if not size:
+            continue
+        if use_layers:
+            rendered = render_text_layers(
+                kv=kv_img,
+                size=size,
+                text_layers=layers_payload,
+                font_family=font_family,
+                text_color_hex=text_color,
+                text_align=text_align,
+            )
+        else:
+            rendered = render_text_layout(
+                kv=kv_img,
+                size=size,
+                headline=headline,
+                subhead=subhead,
+                cta=cta,
+                font_family=font_family,
+                text_color_hex=text_color,
+                headline_box=headline_box,
+                subhead_box=subhead_box,
+                cta_box=cta_box,
+                text_align=text_align,
+                font_scale=float(font_scale),
+            )
+        out_bytes = _pil_to_png_bytes(rendered.image)
+        label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename
+        asset = store.add_asset(
+            project_id=project_id,
+            kind="text_preview",
+            filename=f"text_preview_{label}_{ratio.replace(':','x')}.png",
+            content=out_bytes,
+            metadata={
+                "ratio": ratio,
+                "kv_asset_id": kv_asset_id,
+                "layout_id": layout_id,
+                "font_family": font_family,
+                "text_color": text_color,
+                "text_align": text_align,
+                "text_layers": len(layers_payload) if use_layers else None,
+                "headline": headline if not use_layers else None,
+                "subhead": subhead if not use_layers else None,
+                "cta": cta if not use_layers else None,
+            },
+            subdir="text_previews",
+        )
+        preview_ids.append(asset.asset_id)
+
+    store.write_run_manifest(
+        project_id,
+        {
+            "type": "layout_preview",
+            "provider": "pillow",
+            "model": "render_text_layers" if use_layers else "render_text_layout",
+            "inputs": {
+                "kv_asset_id": kv_asset_id,
+                "layout_id": layout_id,
+                "ratios": ["1:1", "4:5", "9:16"],
+                "text_layers": len(layers_payload) if use_layers else None,
+            },
+            "outputs": {"preview_asset_ids": preview_ids},
+        },
+    )
+
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
+    return RedirectResponse(url=redirect_path, status_code=303)
 
 
 @app.post("/projects/{project_id}/copy/headlines")
@@ -477,6 +723,51 @@ async def generate_headlines(
     proj_dir = Path(settings.data_dir) / "projects" / project_id
     (proj_dir / "copy_headlines.json").write_text(json.dumps({"headlines": lines}, indent=2), "utf-8")
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+
+@app.post("/projects/{project_id}/copy/sets")
+async def generate_copy_sets(
+    project_id: str,
+    brief_text: str = Form(...),
+    count: int = Form(8),
+    use_images: bool = Form(False),
+    return_to: str = Form(""),
+):
+    proj = store.read_project(project_id)
+    ref_paths = [store.abs_asset_path(project_id, a) for a in proj.assets if a.kind in ("reference", "product", "kv")]
+
+    context_text = ""
+    if use_images and ref_paths:
+        gemini = _get_gemini()
+        context_text = await gemini.summarize_brand_language_for_copy(reference_images=ref_paths[:8], brief_text=brief_text)
+
+    full_brief = brief_text
+    if context_text.strip():
+        full_brief = (
+            f"{brief_text}\n\n"
+            "Brand-language cues extracted from reference images:\n"
+            f"{context_text.strip()}\n"
+        )
+
+    openai = _get_openai_text()
+    sets = await openai.generate_copy_sets(brief_text=full_brief, count=int(count))
+
+    store.write_run_manifest(
+        project_id,
+        {
+            "type": "copy_sets",
+            "provider": openai.name,
+            "model": settings.openai_text_model,
+            "inputs": {"count": int(count), "use_images": bool(use_images)},
+            "outputs": {"n_sets": len(sets)},
+        },
+    )
+
+    proj_dir = Path(settings.data_dir) / "projects" / project_id
+    (proj_dir / "copy_sets.json").write_text(json.dumps({"sets": sets}, indent=2), "utf-8")
+
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}/editor"
+    return RedirectResponse(url=redirect_path, status_code=303)
 
 
 @app.post("/projects/{project_id}/masters/build")

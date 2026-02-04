@@ -135,19 +135,16 @@ To make this usable across an agency (and for motif-heavy brands), we will likel
 We discussed simplifying the experience and focusing on "master visual correctness" over deterministic text rendering.
 
 Proposed flow:
-1) User uploads references (and optionally motif).
-2) User enters prompt to generate a small pool of master visuals (n options, max 5).
-3) Tool generates and displays the pool.
-4) User shortlists selected options.
-5) User picks ratios for the shortlisted options.
-6) Tool generates ratio-specific visuals (AI reframe/outpaint) for each shortlisted option and each ratio.
-7) Text placement can be manual (designer) in the short term, since it is easier than getting motif + subject interactions perfect with deterministic compositing.
-8) Longer term, add a lightweight editor so users can place text/logo/motif and preview multiple ratios before export.
+1) User uploads references (and optionally motif/logo assets).
+2) User generates a small pool of **1:1 master visuals** (n options, max 5).
+3) Tool displays the pool and user shortlists.
+4) User opens the **editor** and adds text/logo/motif layers.
+5) Tool renders multi-ratio previews (deterministic) so users can validate layout early.
+6) When a ratio needs more background than crop/pad can provide, optionally run **AI outpaint** on the background only (never on text/logo layers).
 
 Rationale:
-- AI reframe handles motif/subject interaction better than deterministic cropping.
-- Designers can place text manually while we learn what visuals are stable.
-- Keeps the v0 prototype focused and reduces UI clutter.
+- Keep the v0 prototype focused and reduce UI clutter.
+- Separate background generation (AI) from layout/typography (deterministic).
 
 ---
 
@@ -166,19 +163,36 @@ Recommended shape:
 
 ---
 
+## Recommended Structure (IA)
+
+Many production teams organize work as:
+**Brand -> Campaign -> Ad Set -> Masters -> Adapts**
+
+Mapping for this repo (v0 -> v1):
+- **Brand** (v0: metadata field): brand assets/guidelines/logo pack (future: dedicated entity + registry)
+- **Campaign** (v0: metadata field): objective and campaign-level inputs (future: dedicated entity)
+- **Ad Set** (current "Project"): the working workspace for one product/angle/audience
+- **Master** (v0: layout spec + base 1:1 visual): editor state saved as a JSON layout (RenderSpec-lite)
+- **Adapts**: ratio-specific renders from a Master (deterministic), optionally with AI outpaint for background extension
+
+Key decision:
+- Keep v0 on file-based storage, but make the vocabulary/UI match the production mental model.
+
+---
+
 ## Proposed Next Steps
 
-### A) Workflow Simplification (Shortlist -> Ratios)
+### A) UI + Workflow Simplification (Ad Set Page)
 
-- Rename / refactor sections:
-  - "KVs" -> "Visual Pool"
-  - "AI Reframe KV" -> "Generate Ratios"
-- Add shortlist state:
-  - per-visual checkbox "Shortlist"
-  - or a dedicated "Shortlisted" section
-- Add a single "Generate ratios for shortlisted" action:
-  - choose ratios (1:1, 4:5, 9:16, optionally 16:9)
-  - choose image_size (1K/2K/4K)
+- Keep the Ad Set page focused on:
+  - Upload refs/assets
+  - Generate 1:1 visual pool
+  - Shortlist
+  - Open editor
+- Remove/relocate from the Ad Set page:
+  - ratio generation (adapts) -> editor
+  - copy generation -> editor
+  - master rendering -> editor/export
 
 ### B) Deprecate "Masters (Assembly)" In UI (For Now)
 
@@ -201,7 +215,7 @@ Recommended shape:
 - While editing a visual, always show previews in a few key ratios (e.g. 1:1, 4:5, 9:16).
 - Implementation direction:
   - deterministic render from a stored `render_spec.json` (layer model)
-  - optional AI outpaint pass only when background extension is needed
+  - optional AI outpaint pass only when background extension is needed (background-only)
 
 ### E) Better Control for Motif When Asset Is Missing
 

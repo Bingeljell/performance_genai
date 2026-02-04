@@ -89,6 +89,159 @@ def render_master_simple(
     return RenderedMaster(image=base.convert("RGB"), scrim_applied=True)
 
 
+def render_text_layout(
+    kv: Image.Image,
+    size: tuple[int, int],
+    headline: str,
+    subhead: str,
+    cta: str,
+    font_family: str,
+    text_color_hex: str,
+    headline_box: tuple[float, float, float, float],
+    subhead_box: tuple[float, float, float, float],
+    cta_box: tuple[float, float, float, float],
+    text_align: str = "left",
+    font_scale: float = 1.0,
+) -> RenderedMaster:
+    """
+    Deterministic text overlay for editor previews.
+    Boxes are normalized (x, y, w, h) in 0..1 coordinates.
+    """
+    base = _resize_cover(kv.convert("RGB"), size).convert("RGBA")
+    draw = ImageDraw.Draw(base)
+
+    align = (text_align or "left").strip().lower()
+    text_color = _hex_to_rgb(text_color_hex) + (255,)
+
+    def draw_block(text: str, box_norm: tuple[float, float, float, float], scale: float) -> None:
+        if not text:
+            return
+        px_box = _norm_box_to_px(box_norm, size)
+        if px_box is None:
+            return
+        x1, y1, x2, y2 = px_box
+        # No scrim by default; keep previews clean.
+
+        max_font = max(14, int((y2 - y1) * scale * max(0.5, font_scale)))
+        min_font = max(12, int(max_font * 0.55))
+        font, wrapped, spacing = _fit_text_to_box(
+            draw,
+            text,
+            (x1, y1, x2, y2),
+            max_font_px=max_font,
+            min_font_px=min_font,
+            font_family=font_family,
+        )
+        tx = x1
+        ty = y1
+        if align == "center":
+            try:
+                bbox = draw.multiline_textbbox((0, 0), wrapped, font=font, spacing=spacing)
+                tw = bbox[2] - bbox[0]
+            except Exception:
+                tw = 0
+            tx = x1 + max(0, (x2 - x1 - tw) // 2)
+        _draw_multiline(draw, wrapped, (tx, ty), font=font, fill=text_color, spacing=spacing, shadow=True)
+
+    draw_block(headline, headline_box, scale=0.48)
+    draw_block(subhead, subhead_box, scale=0.36)
+
+    # CTA as a button for now.
+    cta_px = _norm_box_to_px(cta_box, size)
+    if cta_px and cta:
+        _draw_cta_button(
+            draw,
+            cta=cta,
+            box=cta_px,
+            fill_hex="#ED8924",
+            text_fill=(255, 255, 255, 255),
+        )
+
+    return RenderedMaster(image=base.convert("RGB"), scrim_applied=True)
+
+
+def render_text_layers(
+    kv: Image.Image,
+    size: tuple[int, int],
+    text_layers: list[dict],
+    font_family: str,
+    text_color_hex: str,
+    text_align: str = "left",
+) -> RenderedMaster:
+    """
+    Render multiple text boxes using absolute font sizes from the editor.
+    Each layer expects:
+      - text: string
+      - box: {x,y,w,h} normalized to 0..1
+      - font_size_norm: font px / canvas height
+      - font_family, color, align (optional overrides)
+    """
+    base = _resize_cover(kv.convert("RGB"), size).convert("RGBA")
+    draw = ImageDraw.Draw(base)
+
+    default_align = (text_align or "left").strip().lower()
+    default_color = _hex_to_rgb(text_color_hex) + (255,)
+
+    for layer in text_layers or []:
+        if not isinstance(layer, dict):
+            continue
+        text = (layer.get("text") or "").strip()
+        if not text:
+            continue
+        box = layer.get("box") or {}
+        try:
+            box_norm = (
+                float(box.get("x", 0)),
+                float(box.get("y", 0)),
+                float(box.get("w", 0)),
+                float(box.get("h", 0)),
+            )
+        except (TypeError, ValueError):
+            continue
+        px_box = _norm_box_to_px(box_norm, size)
+        if px_box is None:
+            continue
+        x1, y1, x2, y2 = px_box
+        max_w = max(1, x2 - x1)
+
+        font_size_norm = layer.get("font_size_norm")
+        if font_size_norm is None:
+            font_px = max(12, int((y2 - y1) * 0.5))
+        else:
+            try:
+                font_px = max(10, int(float(font_size_norm) * size[1]))
+            except (TypeError, ValueError):
+                font_px = max(12, int((y2 - y1) * 0.5))
+
+        layer_font_family = layer.get("font_family") or font_family
+        font = _load_font(font_px, font_family=layer_font_family)
+        spacing = max(2, int(font_px * 0.18))
+        wrapped = _wrap_to_width(draw, text, font, max_w)
+
+        align = (layer.get("align") or default_align).strip().lower()
+        color_hex = layer.get("color") or text_color_hex
+        try:
+            text_color = _hex_to_rgb(color_hex) + (255,)
+        except Exception:
+            text_color = default_color
+
+        tx = x1
+        if align in ("center", "right"):
+            try:
+                bbox = draw.multiline_textbbox((0, 0), wrapped, font=font, spacing=spacing)
+                tw = bbox[2] - bbox[0]
+            except Exception:
+                tw = 0
+            if align == "center":
+                tx = x1 + max(0, (max_w - tw) // 2)
+            else:
+                tx = x2 - tw
+
+        draw.multiline_text((tx, y1), wrapped, font=font, fill=text_color, spacing=spacing)
+
+    return RenderedMaster(image=base.convert("RGB"), scrim_applied=False)
+
+
 def _draw_multiline(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -122,6 +275,29 @@ def _resize_cover(img: Image.Image, size: tuple[int, int]) -> Image.Image:
     return resized.crop((left, top, left + tw, top + th))
 
 
+def _norm_box_to_px(
+    box: tuple[float, float, float, float],
+    size: tuple[int, int],
+) -> tuple[int, int, int, int] | None:
+    x, y, w, h = box
+    if w <= 0 or h <= 0:
+        return None
+    cw, ch = size
+    x1 = max(0, int(x * cw))
+    y1 = max(0, int(y * ch))
+    x2 = min(cw, int((x + w) * cw))
+    y2 = min(ch, int((y + h) * ch))
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return (x1, y1, x2, y2)
+
+
+def _draw_box_scrim(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], alpha: int) -> None:
+    x1, y1, x2, y2 = box
+    a = max(0, min(255, int(alpha)))
+    draw.rectangle([(x1, y1), (x2, y2)], fill=(0, 0, 0, a))
+
+
 def _apply_bottom_gradient_scrim(img_rgba: Image.Image, y0: int, max_alpha: int) -> Image.Image:
     """
     Apply a transparent->black gradient starting at y0 to the bottom.
@@ -139,22 +315,38 @@ def _apply_bottom_gradient_scrim(img_rgba: Image.Image, y0: int, max_alpha: int)
     return Image.alpha_composite(img_rgba, overlay)
 
 
-def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+def _load_font(size: int, font_family: str | None = None) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """
     Prefer a TTF font (system or bundled). If we can't find one, fall back to the
     default bitmap font (which is small and not ideal, but avoids crashing).
     """
     # Allow overriding via env later; for now probe common locations.
-    candidates: list[str] = [
-        "assets/fonts/DejaVuSans.ttf",
-        "assets/fonts/Inter-Regular.ttf",
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/System/Library/Fonts/Supplemental/Helvetica.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/Library/Fonts/Arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "C:\\\\Windows\\\\Fonts\\\\arial.ttf",
-    ]
+    family = (font_family or "").strip().lower()
+    if family in ("dejavu", "dejavu sans", "dejavu_sans"):
+        candidates = [
+            "assets/fonts/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+    elif family in ("helvetica", "helvetica neue"):
+        candidates = [
+            "/System/Library/Fonts/Supplemental/Helvetica.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+        ]
+    elif family in ("inter", "inter regular"):
+        candidates = [
+            "assets/fonts/Inter-Regular.ttf",
+        ]
+    else:
+        candidates = [
+            "assets/fonts/DejaVuSans.ttf",
+            "assets/fonts/Inter-Regular.ttf",
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "/System/Library/Fonts/Supplemental/Helvetica.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/Library/Fonts/Arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "C:\\\\Windows\\\\Fonts\\\\arial.ttf",
+        ]
     try:
         from pathlib import Path
 
@@ -325,6 +517,7 @@ def _fit_text_to_box(
     box: tuple[int, int, int, int],
     max_font_px: int,
     min_font_px: int,
+    font_family: str | None = None,
 ) -> tuple[ImageFont.ImageFont, str, int]:
     x1, y1, x2, y2 = box
     max_w = max(1, x2 - x1)
@@ -333,7 +526,7 @@ def _fit_text_to_box(
     max_font_px = max(min_font_px, max_font_px)
 
     for px in range(max_font_px, min_font_px - 1, -2):
-        font = _load_font(px)
+        font = _load_font(px, font_family=font_family)
         spacing = max(2, int(px * 0.18))
         wrapped = _wrap_to_width(draw, text, font, max_w)
         try:
@@ -346,7 +539,7 @@ def _fit_text_to_box(
             # Fallback: accept this size if no bbox measurement available.
             return font, wrapped, spacing
 
-    font = _load_font(min_font_px)
+    font = _load_font(min_font_px, font_family=font_family)
     spacing = max(2, int(min_font_px * 0.18))
     return font, _wrap_to_width(draw, text, font, max_w), spacing
 

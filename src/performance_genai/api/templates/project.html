@@ -52,18 +52,21 @@
     <div class="wrap">
       <div class="topbar">
         <div class="title">
-          <div class="muted"><a href="/">&lt;- projects</a></div>
+          <div class="muted"><a href="/">&lt;- ad sets</a></div>
           <h1>{{ project.name }}</h1>
-          <div class="meta">Project ID: <code>{{ project.project_id }}</code></div>
+          <div class="meta">
+            {% if project.brand_name %}Brand: <code>{{ project.brand_name }}</code>{% endif %}
+            {% if project.campaign_name %} Campaign: <code>{{ project.campaign_name }}</code>{% endif %}
+            &nbsp; Ad set ID: <code>{{ project.project_id }}</code>
+          </div>
         </div>
         <div class="row" style="align-items:center;">
           <span class="pill">refs: {{ (assets | selectattr('kind','equalto','reference') | list | length) }}</span>
           <span class="pill">visuals: {{ base_kvs|length }}</span>
           <span class="pill">shortlisted: {{ shortlisted_kvs|length }}</span>
-          <span class="pill">ratios: {{ ratio_kvs|length }}</span>
-          <span class="pill">masters: {{ masters|length }}</span>
+          <a class="btn" href="/projects/{{ project.project_id }}/editor">Open editor</a>
           <form method="post" action="/projects/{{ project.project_id }}/delete" onsubmit="return confirm('Delete this project and all its assets?');">
-            <button class="btn btn-danger" type="submit">Delete project</button>
+            <button class="btn btn-danger" type="submit">Delete ad set</button>
           </form>
         </div>
       </div>
@@ -86,19 +89,22 @@
           </div>
 
           <div class="panel">
-            <h2>Brand Profile (Vision)</h2>
-            <div class="muted">Uses uploaded images to propose palette/mood/composition and do/don't language.</div>
-            <form method="post" action="/projects/{{ project.project_id }}/profile/propose">
-              <label>Brief (optional)</label>
-              <textarea name="brief_text" placeholder="Product, objective, tone..."></textarea>
-              <button class="btn" type="submit" style="margin-top:10px;">Propose profile</button>
-            </form>
-            {% if observed_profile %}
-              <details style="margin-top:10px;">
-                <summary class="muted">View observed_profile</summary>
-                <pre style="white-space: pre-wrap; font-size: 12px; color: rgba(255,255,255,0.82);">{{ observed_profile_pretty }}</pre>
-              </details>
-            {% endif %}
+            <h2>Brand Profile (Advanced)</h2>
+            <details>
+              <summary class="muted">Propose observed profile from uploaded images</summary>
+              <div class="muted" style="margin-top:6px;">Uses uploaded images to propose palette/mood/composition and do/don't language.</div>
+              <form method="post" action="/projects/{{ project.project_id }}/profile/propose">
+                <label>Brief (optional)</label>
+                <textarea name="brief_text" placeholder="Product, objective, tone..."></textarea>
+                <button class="btn" type="submit" style="margin-top:10px;">Propose profile</button>
+              </form>
+              {% if observed_profile %}
+                <details style="margin-top:10px;">
+                  <summary class="muted">View observed_profile</summary>
+                  <pre style="white-space: pre-wrap; font-size: 12px; color: rgba(255,255,255,0.82);">{{ observed_profile_pretty }}</pre>
+                </details>
+              {% endif %}
+            </details>
           </div>
 
           <div class="panel">
@@ -107,6 +113,7 @@
             <form method="post" action="/projects/{{ project.project_id }}/kvs/generate">
               <label>Prompt</label>
               <textarea name="prompt" required placeholder="e.g., lifestyle scene..."></textarea>
+              <input type="hidden" name="aspect_ratio" value="1:1" />
               <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
                 <input type="checkbox" name="use_images" value="true" checked />
                 Use uploaded reference/product images as visual refs
@@ -116,162 +123,9 @@
                   <label>N</label>
                   <input type="number" name="n" value="3" min="1" max="5" />
                 </div>
-                <div>
-                  <label>Aspect ratio</label>
-                  <select name="aspect_ratio">
-                    <option value="1:1">1:1</option>
-                    <option value="4:5">4:5</option>
-                    <option value="9:16">9:16</option>
-                  </select>
-                </div>
+                <div></div>
               </div>
               <button class="btn" type="submit" style="margin-top:10px;">Generate</button>
-            </form>
-          </div>
-
-          <div class="panel">
-            <h2>Generate Ratios (Shortlisted)</h2>
-            <div class="muted">Uses AI reframe/outpaint to create ratio-specific visuals from your shortlisted base images.</div>
-            <div class="muted" style="margin-top:6px;">Shortlisted: {{ shortlisted_kvs|length }}</div>
-            <form method="post" action="/projects/{{ project.project_id }}/kvs/reframe_batch">
-              <label>Target ratios</label>
-              <div class="row" style="margin-top:6px;">
-                <div>
-                  <label style="display:flex; gap:8px; align-items:center;">
-                    <input type="checkbox" name="aspect_ratios" value="1:1" checked />
-                    1:1
-                  </label>
-                  <label style="display:flex; gap:8px; align-items:center;">
-                    <input type="checkbox" name="aspect_ratios" value="4:5" checked />
-                    4:5
-                  </label>
-                  <label style="display:flex; gap:8px; align-items:center;">
-                    <input type="checkbox" name="aspect_ratios" value="9:16" checked />
-                    9:16
-                  </label>
-                </div>
-                <div>
-                  <label style="display:flex; gap:8px; align-items:center;">
-                    <input type="checkbox" name="aspect_ratios" value="16:9" />
-                    16:9
-                  </label>
-                  <label style="display:flex; gap:8px; align-items:center;">
-                    <input type="checkbox" name="aspect_ratios" value="3:4" />
-                    3:4
-                  </label>
-                  <label style="display:flex; gap:8px; align-items:center;">
-                    <input type="checkbox" name="aspect_ratios" value="4:3" />
-                    4:3
-                  </label>
-                </div>
-              </div>
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label>Image size</label>
-                  <select name="image_size">
-                    <option value="1K">1K</option>
-                    <option value="2K" selected>2K</option>
-                    <option value="4K">4K</option>
-                  </select>
-                </div>
-                <div>
-                  <label>N per ratio</label>
-                  <input type="number" name="n_per_ratio" value="1" min="1" max="3" />
-                </div>
-              </div>
-              <label>Motif (optional, transparent PNG)</label>
-              <select name="motif_asset_id">
-                <option value="">(none)</option>
-                {% for m in motifs %}
-                  <option value="{{ m.asset_id }}">{{ m.asset_id }} ({{ m.filename }})</option>
-                {% endfor %}
-              </select>
-              <label>Instruction (optional)</label>
-              <textarea name="prompt">Return the SAME image, just expanded to the target aspect ratio by outpainting ONLY the new canvas areas. Do NOT change the existing pixels/subject identity. No text, no logos, no watermarks.</textarea>
-              <button class="btn" type="submit" style="margin-top:10px;">Generate ratios</button>
-              {% if not shortlisted_kvs %}
-                <p class="muted" style="margin-top:10px;">Shortlist at least one visual below.</p>
-              {% endif %}
-            </form>
-          </div>
-
-          <div class="panel">
-            <h2>Copy (Headlines)</h2>
-            <form method="post" action="/projects/{{ project.project_id }}/copy/headlines">
-              <label>Brief</label>
-              <textarea name="brief_text" required placeholder="Product details, offer, objective, constraints..."></textarea>
-              <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
-                <input type="checkbox" name="use_images" value="true" />
-                Use uploaded images as reference
-              </label>
-              <label>Count</label>
-              <input type="number" name="count" value="10" min="3" max="30" />
-              <button class="btn" type="submit" style="margin-top:10px;">Generate headlines</button>
-            </form>
-          </div>
-
-          <div class="panel">
-            <h2>Masters (Advanced)</h2>
-            <div class="muted">Optional deterministic overlay of headline + CTA. Keep for later if you will place text manually.</div>
-            <form method="post" action="/projects/{{ project.project_id }}/masters/build">
-              <label>KV</label>
-              <select name="kv_asset_id" required>
-                {% for kv in kvs %}
-                  <option value="{{ kv.asset_id }}" {% if kv.asset_id == selected_kv %}selected{% endif %}>{{ kv.asset_id }} ({{ kv.filename }})</option>
-                {% endfor %}
-              </select>
-              <label>Headline (select or type)</label>
-              <select name="headline_select">
-                <option value="">(select headline)</option>
-                {% for h in headlines %}
-                  <option value="{{ h }}" {% if h == selected_headline %}selected{% endif %}>{{ h }}</option>
-                {% endfor %}
-              </select>
-              <input type="text" name="headline" placeholder="Or type a headline" value="{{ selected_headline }}" />
-              <label>CTA</label>
-              <input type="text" name="cta" value="Learn more" />
-              <label>Motif (optional)</label>
-              <select name="motif_asset_id">
-                <option value="">(none)</option>
-                {% for m in motifs %}
-                  <option value="{{ m.asset_id }}">{{ m.asset_id }} ({{ m.filename }})</option>
-                {% endfor %}
-              </select>
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label>Motif position</label>
-                  <select name="motif_position">
-                    <option value="right">right</option>
-                    <option value="left">left</option>
-                    <option value="center">center</option>
-                    <option value="full">full (cover)</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Subject position (protect)</label>
-                  <select name="subject_position">
-                    <option value="right">right</option>
-                    <option value="left">left</option>
-                    <option value="center">center</option>
-                    <option value="none">none</option>
-                  </select>
-                </div>
-              </div>
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label>Motif opacity</label>
-                  <input type="number" name="motif_opacity" value="0.14" min="0" max="1" step="0.01" />
-                </div>
-                <div>
-                  <label>Motif tint hex</label>
-                  <input type="text" name="motif_tint_hex" value="#266156" />
-                  <div class="muted">Set empty to keep motif's original color.</div>
-                </div>
-              </div>
-              <button class="btn" type="submit" style="margin-top:10px;">Build 3 ratios</button>
-              {% if not kvs %}
-                <p class="muted" style="margin-top:10px;">Generate a KV first.</p>
-              {% endif %}
             </form>
           </div>
         </div>
@@ -326,6 +180,9 @@
                       <small><code>{{ a.asset_id }}</code></small>
                     </div>
                     <div class="k">
+                      <small class="muted">{{ a.metadata.get('display_name', a.filename) }}</small>
+                    </div>
+                    <div class="k">
                       <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
                       {% if a.metadata.get('shortlisted') %}
                         <small class="pill">shortlisted</small>
@@ -358,6 +215,9 @@
                       <small><code>{{ a.asset_id }}</code></small>
                     </div>
                     <div class="k">
+                      <small class="muted">{{ a.metadata.get('display_name', a.filename) }}</small>
+                    </div>
+                    <div class="k">
                       <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
                       <form method="post" action="/projects/{{ project.project_id }}/kvs/{{ a.asset_id }}/shortlist">
                         <input type="hidden" name="shortlisted" value="0" />
@@ -369,103 +229,6 @@
               </div>
             {% else %}
               <p class="muted">No shortlisted visuals yet.</p>
-            {% endif %}
-          </div>
-
-          <div class="panel">
-            <h2>Ratio Outputs</h2>
-            {% if ratio_kvs %}
-              <div class="k" style="margin-bottom:10px;">
-                <small class="muted">Bulk actions</small>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <button class="btn" type="button" onclick="toggleAll('ratio', true)">Select all</button>
-                  <button class="btn" type="button" onclick="toggleAll('ratio', false)">Clear</button>
-                  <form id="bulk_ratio_delete" method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete" onsubmit="return confirm('Delete selected ratio outputs?');">
-                    <button class="btn btn-danger" type="submit">Delete selected</button>
-                  </form>
-                </div>
-              </div>
-              <div class="grid">
-                {% for a in ratio_kvs %}
-                  <div class="item">
-                    <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
-                    <div class="k">
-                      <small>
-                        <input data-bulk="ratio" type="checkbox" name="asset_ids" value="{{ a.asset_id }}" form="bulk_ratio_delete" />
-                        {{ a.metadata.get('aspect_ratio', 'ratio') }}
-                      </small>
-                      <small><code>{{ a.asset_id }}</code></small>
-                    </div>
-                    <div class="k">
-                      <small class="muted">from {{ a.metadata.get('source_kv_asset_id', 'kv') }}</small>
-                    </div>
-                    <div class="k">
-                      <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                      <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this output?');">
-                        <button class="btn" type="submit">Delete</button>
-                      </form>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <p class="muted">No ratio outputs yet.</p>
-            {% endif %}
-          </div>
-
-          <div class="panel">
-            <h2>Masters (Advanced)</h2>
-            {% if masters %}
-              <div class="k" style="margin-bottom:10px;">
-                <small class="muted">Bulk actions</small>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <button class="btn" type="button" onclick="toggleAll('master', true)">Select all</button>
-                  <button class="btn" type="button" onclick="toggleAll('master', false)">Clear</button>
-                  <form id="bulk_master_delete" method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete" onsubmit="return confirm('Delete selected masters?');">
-                    <button class="btn btn-danger" type="submit">Delete selected</button>
-                  </form>
-                </div>
-              </div>
-              <div class="grid">
-                {% for a in masters %}
-                  <div class="item">
-                    <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
-                    <div class="k">
-                      <small>
-                        <input data-bulk="master" type="checkbox" name="asset_ids" value="{{ a.asset_id }}" form="bulk_master_delete" />
-                        {{ a.metadata.ratio }}
-                      </small>
-                      <small><code>{{ a.asset_id }}</code></small>
-                    </div>
-                    <div class="k">
-                      <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                      <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this master?');">
-                        <button class="btn" type="submit">Delete</button>
-                      </form>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <p class="muted">No masters yet.</p>
-            {% endif %}
-          </div>
-
-          <div class="panel">
-            <h2>Headlines</h2>
-            {% if headlines %}
-              <div class="item">
-                <ol style="margin: 0; padding-left: 18px;">
-                  {% for h in headlines %}
-                    <li style="margin-bottom: 6px;">
-                      {{ h }}
-                      <a class="muted" href="/projects/{{ project.project_id }}?headline={{ h|urlencode }}">use</a>
-                    </li>
-                  {% endfor %}
-                </ol>
-              </div>
-            {% else %}
-              <p class="muted">No headlines yet.</p>
             {% endif %}
           </div>
         </div>
