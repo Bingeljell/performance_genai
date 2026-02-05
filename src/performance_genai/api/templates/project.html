@@ -31,6 +31,8 @@
       code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 8px; border: 1px solid var(--stroke); }
       .wrap { max-width: 100%; margin: 0 auto; padding: 24px 28px 36px; }
       .topbar { display:flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px 18px; border: 1px solid var(--stroke); border-radius: 18px; background: var(--panel); box-shadow: 0 16px 36px var(--shadow); }
+      .brand-mark { display:flex; align-items:center; gap: 12px; }
+      .brand-logo { height: 28px; width: auto; display:block; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.35)); }
       .title { display:flex; flex-direction: column; gap: 2px; }
       .title h1 { font-size: 22px; margin: 0; letter-spacing: 0.3px; font-family: "Space Grotesk", "Manrope", sans-serif; }
       .title .meta { color: var(--muted); font-size: 12px; }
@@ -64,13 +66,16 @@
   <body>
     <div class="wrap">
       <div class="topbar">
-        <div class="title">
-          <div class="muted"><a href="/">&lt;- ad sets</a></div>
-          <h1>{{ project.name }}</h1>
-          <div class="meta">
-            {% if project.brand_name %}Brand: <code>{{ project.brand_name }}</code>{% endif %}
-            {% if project.campaign_name %} Campaign: <code>{{ project.campaign_name }}</code>{% endif %}
-            &nbsp; Ad set ID: <code>{{ project.project_id }}</code>
+        <div class="brand-mark">
+          <img class="brand-logo" src="/assets/avigya-horizontal.png" alt="Avigya" />
+          <div class="title">
+            <div class="muted"><a href="/">&lt;- ad sets</a></div>
+            <h1>{{ project.name }}</h1>
+            <div class="meta">
+              {% if project.brand_name %}Brand: <code>{{ project.brand_name }}</code>{% endif %}
+              {% if project.campaign_name %} Campaign: <code>{{ project.campaign_name }}</code>{% endif %}
+              &nbsp; Ad set ID: <code>{{ project.project_id }}</code>
+            </div>
           </div>
         </div>
         <div class="row" style="align-items:center;">

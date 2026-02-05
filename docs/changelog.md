@@ -135,3 +135,5 @@
 - **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > restructure landing page into brand cards with collapsible campaign sections**
 - **2026-02-05 > src/performance_genai/api/app.py > n/a > mount repo-level assets directory for logo use on landing page**
 - **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > add logo header and chevron indicators for campaign accordions**
+- **2026-02-05 > src/performance_genai/api/templates/project.html > n/a > add horizontal logo to inner page topbar**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add horizontal logo and expand editor layout to full viewport width**

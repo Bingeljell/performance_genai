@@ -26,8 +26,10 @@
       }
       a { color: var(--link); text-decoration: none; }
       a:hover { text-decoration: underline; }
-      .wrap { max-width: 1400px; margin: 0 auto; padding: 20px 18px 34px; }
+      .wrap { max-width: 100%; width: 100%; margin: 0 auto; padding: 20px 24px 34px; }
       .topbar { display:flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 16px; background: var(--panel); box-shadow: 0 12px 30px var(--shadow); }
+      .brand-mark { display:flex; align-items:center; gap: 12px; }
+      .brand-logo { height: 26px; width: auto; display:block; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.35)); }
       .title { display:flex; flex-direction: column; gap: 2px; }
       .title h1 { font-size: 20px; margin: 0; letter-spacing: 0.2px; font-family: "Space Grotesk", "Manrope", sans-serif; }
       .title .meta { color: var(--muted); font-size: 12px; }
@@ -72,13 +74,16 @@
   <body data-project-id="{{ project.project_id }}">
     <div class="wrap">
       <div class="topbar">
-        <div class="title">
-          <div class="muted"><a href="/projects/{{ project.project_id }}">&lt;- back to project</a></div>
-          <h1>{{ project.name }} — Editor</h1>
-          <div class="meta">
-            {% if project.brand_name %}Brand: <code>{{ project.brand_name }}</code>{% endif %}
-            {% if project.campaign_name %} Campaign: <code>{{ project.campaign_name }}</code>{% endif %}
-            &nbsp; Ad set ID: <code>{{ project.project_id }}</code>
+        <div class="brand-mark">
+          <img class="brand-logo" src="/assets/avigya-horizontal.png" alt="Avigya" />
+          <div class="title">
+            <div class="muted"><a href="/projects/{{ project.project_id }}">&lt;- back to project</a></div>
+            <h1>{{ project.name }} — Editor</h1>
+            <div class="meta">
+              {% if project.brand_name %}Brand: <code>{{ project.brand_name }}</code>{% endif %}
+              {% if project.campaign_name %} Campaign: <code>{{ project.campaign_name }}</code>{% endif %}
+              &nbsp; Ad set ID: <code>{{ project.project_id }}</code>
+            </div>
           </div>
         </div>
         <div class="muted">Text placement (Fabric)</div>
