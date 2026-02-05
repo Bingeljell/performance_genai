@@ -474,6 +474,18 @@
     }
   }
 
+  function setupPreviewBulkSelect() {
+    var selectAll = document.getElementById("preview-select-all");
+    if (!selectAll) return;
+    var boxes = Array.prototype.slice.call(document.querySelectorAll(".preview-select"));
+    selectAll.addEventListener("change", function () {
+      var next = !!selectAll.checked;
+      boxes.forEach(function (box) {
+        box.checked = next;
+      });
+    });
+  }
+
   function isEditableTarget(target) {
     if (!target) return false;
     var tag = (target.tagName || "").toLowerCase();
@@ -681,6 +693,7 @@
     guideRatio = (guideSelect && guideSelect.value) || guideRatio;
     setBackground(kvMap[select.value]);
   }
+    setupPreviewBulkSelect();
     return true;
   }
 

@@ -132,6 +132,13 @@
             </form>
 
             {% if copy_sets %}
+              <div style="margin-top:10px;">
+                <form method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" onsubmit="return confirm('Clear all copy sets?');">
+                  <input type="hidden" name="clear_all" value="1" />
+                  <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                  <button class="btn btn-danger" type="submit">Clear all copy sets</button>
+                </form>
+              </div>
               <div class="grid">
                 {% for s in copy_sets %}
                   <div class="item">
@@ -151,6 +158,11 @@
                       >
                         Insert set
                       </button>
+                      <form method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" onsubmit="return confirm('Delete this copy set?');">
+                        <input type="hidden" name="indices" value="{{ loop.index0 }}" />
+                        <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                        <button class="btn" type="submit">Delete</button>
+                      </form>
                     </div>
                   </div>
                 {% endfor %}
@@ -197,8 +209,9 @@
                     Select all
                   </label>
                 </div>
-                <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete" onsubmit="return confirm('Delete selected previews?');">
+                <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete">
                   <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                  <input type="hidden" name="asset_kind" value="text_preview" />
                   <div class="grid">
                     {% for a in text_previews[:9] %}
                       <div class="item">
@@ -226,7 +239,7 @@
                     {% endfor %}
                   </div>
                   <div class="k" style="margin-top:10px;">
-                    <button class="btn" type="submit">Delete selected</button>
+                    <button class="btn" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
                   </div>
                 </form>
               </div>
@@ -236,6 +249,6 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=14"></script>
+    <script src="/static/editor.js?v=16"></script>
   </body>
 </html>

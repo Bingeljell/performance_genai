@@ -84,3 +84,12 @@
 - **2026-02-04 > src/performance_genai/assembly/render.py > _render_base_image > preserve KV aspect ratio when mapping guide-based image boxes across ratios**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add per-text font size controls and edit buttons (delete/duplicate/layer) with cache buster v14**
 - **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > apply styling to selected text, add per-text font sizing, delete/duplicate/layer controls, and arrow-key nudging**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add preview selection checkboxes, bulk delete form, and cache buster v15**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > add select-all behavior for preview bulk deletes**
+- **2026-02-04 > src/performance_genai/api/app.py > bulk_delete_assets > restrict bulk deletion to text previews and honor return_to**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > move bulk delete confirmation to button to avoid per-item delete prompts**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > run preview select-all setup regardless of Fabric load timing**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v16 for bulk preview selection updates**
+- **2026-02-04 > src/performance_genai/api/app.py > bulk_delete_assets/delete_headlines > allow asset-kind scoped bulk deletes and add headline deletion endpoint**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > pass asset_kind for preview bulk deletes**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > add collapsible headlines panel with clear/delete actions and pass asset_kind for KV bulk deletes**

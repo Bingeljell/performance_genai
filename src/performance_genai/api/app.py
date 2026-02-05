@@ -255,14 +255,59 @@ def shortlist_kv(project_id: str, asset_id: str, shortlisted: str = Form("1")):
 
 
 @app.post("/projects/{project_id}/assets/bulk_delete")
-def bulk_delete_assets(project_id: str, asset_ids: list[str] = Form(default=[])):
+def bulk_delete_assets(
+    project_id: str,
+    asset_ids: list[str] = Form(default=[]),
+    asset_kind: str = Form(""),
+    return_to: str = Form(""),
+):
     # v0: best-effort bulk delete for faster iteration.
+    proj = store.read_project(project_id)
+    if asset_kind:
+        allowed = {a.asset_id for a in proj.assets if a.kind == asset_kind}
+    else:
+        allowed = {a.asset_id for a in proj.assets}
     for asset_id in asset_ids:
+        if asset_id not in allowed:
+            continue
         try:
             store.delete_asset(project_id, asset_id)
         except Exception:
             continue
-    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
+    return RedirectResponse(url=redirect_path, status_code=303)
+
+
+@app.post("/projects/{project_id}/copy/headlines/delete")
+def delete_headlines(
+    project_id: str,
+    indices: list[int] = Form(default=[]),
+    clear_all: str = Form(""),
+    return_to: str = Form(""),
+):
+    proj_dir = Path(settings.data_dir) / "projects" / project_id
+    hl_path = proj_dir / "copy_headlines.json"
+    headlines: list[str] = []
+    if hl_path.exists():
+        try:
+            headlines = json.loads(hl_path.read_text("utf-8")).get("headlines", []) or []
+        except Exception:
+            headlines = []
+
+    if _parse_bool(clear_all):
+        headlines = []
+    elif indices:
+        remove: set[int] = set()
+        for idx in indices:
+            try:
+                remove.add(int(idx))
+            except (TypeError, ValueError):
+                continue
+        headlines = [h for i, h in enumerate(headlines) if i not in remove]
+
+    hl_path.write_text(json.dumps({"headlines": headlines}, indent=2), "utf-8")
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
+    return RedirectResponse(url=redirect_path, status_code=303)
 
 
 @app.get("/projects/{project_id}/assets/{asset_id}")
@@ -779,6 +824,38 @@ async def generate_copy_sets(
     proj_dir = Path(settings.data_dir) / "projects" / project_id
     (proj_dir / "copy_sets.json").write_text(json.dumps({"sets": sets}, indent=2), "utf-8")
 
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}/editor"
+    return RedirectResponse(url=redirect_path, status_code=303)
+
+
+@app.post("/projects/{project_id}/copy/sets/delete")
+def delete_copy_sets(
+    project_id: str,
+    indices: list[int] = Form(default=[]),
+    clear_all: str = Form(""),
+    return_to: str = Form(""),
+):
+    proj_dir = Path(settings.data_dir) / "projects" / project_id
+    cs_path = proj_dir / "copy_sets.json"
+    sets: list[dict[str, str]] = []
+    if cs_path.exists():
+        try:
+            sets = json.loads(cs_path.read_text("utf-8")).get("sets", []) or []
+        except Exception:
+            sets = []
+
+    if _parse_bool(clear_all):
+        sets = []
+    elif indices:
+        remove: set[int] = set()
+        for idx in indices:
+            try:
+                remove.add(int(idx))
+            except (TypeError, ValueError):
+                continue
+        sets = [s for i, s in enumerate(sets) if i not in remove]
+
+    cs_path.write_text(json.dumps({"sets": sets}, indent=2), "utf-8")
     redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}/editor"
     return RedirectResponse(url=redirect_path, status_code=303)
 
