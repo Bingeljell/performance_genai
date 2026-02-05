@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -104,12 +105,15 @@ def render_text_layout(
     font_scale: float = 1.0,
     image_box: dict | None = None,
     elements: list[dict] | None = None,
+    shapes: list[dict] | None = None,
 ) -> RenderedMaster:
     """
     Deterministic text overlay for editor previews.
     Boxes are normalized (x, y, w, h) in 0..1 coordinates.
     """
     base = _render_base_image(kv, size, image_box=image_box)
+    if shapes:
+        _apply_shapes(base, size, shapes)
     if elements:
         _apply_elements(base, size, elements)
     draw = ImageDraw.Draw(base)
@@ -173,6 +177,7 @@ def render_text_layers(
     text_align: str = "left",
     image_box: dict | None = None,
     elements: list[dict] | None = None,
+    shapes: list[dict] | None = None,
 ) -> RenderedMaster:
     """
     Render multiple text boxes using absolute font sizes from the editor.
@@ -183,6 +188,8 @@ def render_text_layers(
       - font_family, color, align (optional overrides)
     """
     base = _render_base_image(kv, size, image_box=image_box)
+    if shapes:
+        _apply_shapes(base, size, shapes)
     if elements:
         _apply_elements(base, size, elements)
     draw = ImageDraw.Draw(base)
@@ -251,6 +258,31 @@ def render_text_layers(
             text_color = _hex_to_rgb(color_hex) + (255,)
         except Exception:
             text_color = default_color
+
+        bg_color = layer.get("bg_color")
+        bg_opacity = layer.get("bg_opacity")
+        if bg_color and bg_opacity is not None:
+            try:
+                alpha = max(0, min(1, float(bg_opacity)))
+            except (TypeError, ValueError):
+                alpha = 0
+            if alpha > 0:
+                try:
+                    bg_rgb = _hex_to_rgb(bg_color)
+                except Exception:
+                    bg_rgb = (0, 0, 0)
+                bg_fill = bg_rgb + (int(alpha * 255),)
+                radius_px = 0
+                if layer.get("bg_radius_px") is not None and layer.get("bg_radius_base_width"):
+                    try:
+                        radius_px = float(layer.get("bg_radius_px")) * (size[0] / float(layer.get("bg_radius_base_width")))
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        radius_px = 0
+                radius_px = max(0, min(radius_px, min(max_w, y2 - y1) / 2))
+                try:
+                    draw.rounded_rectangle((x1, y1, x2, y2), radius=radius_px, fill=bg_fill)
+                except Exception:
+                    draw.rectangle((x1, y1, x2, y2), fill=bg_fill)
 
         tx = x1
         if align in ("center", "right"):
@@ -401,6 +433,61 @@ def _apply_elements(base: Image.Image, size: tuple[int, int], elements: list[dic
             except Exception:
                 pass
         base.paste(layer, (x1, y1), layer)
+
+
+def _apply_shapes(base: Image.Image, size: tuple[int, int], shapes: list[dict]) -> None:
+    tw, th = size
+    draw = ImageDraw.Draw(base, "RGBA")
+    for shape in shapes:
+        if not isinstance(shape, dict):
+            continue
+        box = shape.get("box")
+        if not isinstance(box, (list, tuple)) or len(box) != 4:
+            continue
+        try:
+            x, y, w, h = [float(v) for v in box]
+        except (TypeError, ValueError):
+            continue
+        if w <= 0 or h <= 0:
+            continue
+        x1 = int(x * tw)
+        y1 = int(y * th)
+        x2 = int((x + w) * tw)
+        y2 = int((y + h) * th)
+        color_hex = shape.get("color") or "#ffffff"
+        try:
+            rgb = _hex_to_rgb(color_hex)
+        except Exception:
+            rgb = (255, 255, 255)
+        try:
+            alpha = max(0.0, min(1.0, float(shape.get("opacity", 1))))
+        except (TypeError, ValueError):
+            alpha = 1.0
+        fill = rgb + (int(alpha * 255),)
+        shape_type = (shape.get("shape") or "rect").lower()
+
+        if shape_type == "square":
+            side = min(x2 - x1, y2 - y1)
+            x2 = x1 + side
+            y2 = y1 + side
+            draw.rectangle((x1, y1, x2, y2), fill=fill)
+        elif shape_type == "circle":
+            draw.ellipse((x1, y1, x2, y2), fill=fill)
+        elif shape_type == "triangle":
+            draw.polygon([(x1, y2), ((x1 + x2) // 2, y1), (x2, y2)], fill=fill)
+        elif shape_type == "star":
+            cx = (x1 + x2) / 2
+            cy = (y1 + y2) / 2
+            outer = min(x2 - x1, y2 - y1) / 2
+            inner = outer * 0.5
+            points = []
+            for i in range(10):
+                ang = math.radians(i * 36 - 90)
+                r = outer if i % 2 == 0 else inner
+                points.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
+            draw.polygon(points, fill=fill)
+        else:
+            draw.rectangle((x1, y1, x2, y2), fill=fill)
 
 
 def _norm_box_to_px(

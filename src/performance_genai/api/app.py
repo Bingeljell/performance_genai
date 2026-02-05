@@ -443,6 +443,7 @@ async def outpaint_layout(
             text_align=new_layout.get("text_align") or "left",
             image_box=None,
             elements=render_elements,
+            shapes=new_layout.get("shapes") or [],
         )
     else:
         rendered = render_text_layout(
@@ -459,6 +460,7 @@ async def outpaint_layout(
             cta_box=new_layout.get("cta_box"),
             image_box=None,
             elements=render_elements,
+            shapes=new_layout.get("shapes") or [],
         )
 
     preview_asset = store.add_asset(
@@ -855,6 +857,7 @@ async def preview_text_layout(
     text_layers: str = Form(""),
     image_box: str = Form(""),
     elements: str = Form(""),
+    shapes: str = Form(""),
     guide_ratio: str = Form(""),
     headline: str = Form(""),
     subhead: str = Form(""),
@@ -915,6 +918,15 @@ async def preview_text_layout(
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=400, detail=f"elements must be JSON list: {exc}") from exc
 
+    shapes_payload: list[dict] = []
+    if shapes.strip():
+        try:
+            parsed = json.loads(shapes)
+            if isinstance(parsed, list):
+                shapes_payload = parsed
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"shapes must be JSON list: {exc}") from exc
+
     headline_box = _parse_box_from_form(headline_x, headline_y, headline_w, headline_h, (0.06, 0.60, 0.88, 0.16))
     subhead_box = _parse_box_from_form(subhead_x, subhead_y, subhead_w, subhead_h, (0.06, 0.76, 0.88, 0.08))
     cta_box = _parse_box_from_form(cta_x, cta_y, cta_w, cta_h, (0.06, 0.86, 0.50, 0.10))
@@ -945,6 +957,30 @@ async def preview_text_layout(
                 }
             )
 
+    shapes_layout: list[dict] = []
+    if shapes_payload:
+        for shape in shapes_payload:
+            if not isinstance(shape, dict):
+                continue
+            box = shape.get("box") if isinstance(shape.get("box"), dict) else {}
+            try:
+                box_norm = (
+                    float(box.get("x", 0)),
+                    float(box.get("y", 0)),
+                    float(box.get("w", 0)),
+                    float(box.get("h", 0)),
+                )
+            except (TypeError, ValueError):
+                continue
+            shapes_layout.append(
+                {
+                    "shape": shape.get("shape") or shape.get("type") or "rect",
+                    "box": box_norm,
+                    "color": shape.get("color") or "#ffffff",
+                    "opacity": float(shape.get("opacity", 1) or 1),
+                }
+            )
+
     if use_layers:
         layout = {
             "layout_id": layout_id,
@@ -957,6 +993,7 @@ async def preview_text_layout(
             "image_box": image_box_payload,
             "text_layers": layers_payload,
             "elements": elements_layout,
+            "shapes": shapes_layout,
         }
     else:
         layout = {
@@ -975,6 +1012,7 @@ async def preview_text_layout(
             "cta_box": cta_box,
             "image_box": image_box_payload,
             "elements": elements_layout,
+            "shapes": shapes_layout,
         }
 
     proj_dir = Path(settings.data_dir) / "projects" / project_id
@@ -1031,6 +1069,7 @@ async def preview_text_layout(
                 "image_box": image_box_payload,
                 "text_layers": layers_payload,
                 "elements": elements_layout,
+                "shapes": shapes_layout,
             }
         else:
             ratio_layout = {
@@ -1051,6 +1090,7 @@ async def preview_text_layout(
                 "cta_box": cta_box,
                 "image_box": image_box_payload,
                 "elements": elements_layout,
+                "shapes": shapes_layout,
             }
         (layouts_dir / f"layout_{ratio_layout_id}.json").write_text(json.dumps(ratio_layout, indent=2), "utf-8")
 
@@ -1064,6 +1104,7 @@ async def preview_text_layout(
                 text_align=text_align,
                 image_box=image_box_payload,
                 elements=render_elements,
+                shapes=shapes_layout,
             )
         else:
             rendered = render_text_layout(
@@ -1081,6 +1122,7 @@ async def preview_text_layout(
                 font_scale=float(font_scale),
                 image_box=image_box_payload,
                 elements=render_elements,
+                shapes=shapes_layout,
             )
         out_bytes = _pil_to_png_bytes(rendered.image)
         label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename

@@ -80,6 +80,14 @@
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
   var colorSwatch = document.getElementById("color-swatch");
+  var textBgColor = document.getElementById("text-bg-color");
+  var textBgHex = document.getElementById("text-bg-hex");
+  var textBgOpacity = document.getElementById("text-bg-opacity");
+  var textBgRadius = document.getElementById("text-bg-radius");
+  var shapeColor = document.getElementById("shape-color");
+  var shapeHex = document.getElementById("shape-hex");
+  var shapeOpacity = document.getElementById("shape-opacity");
+  var shapeButtons = document.querySelectorAll("[data-shape]");
   var assetUploadBtn = document.getElementById("btn-upload-asset");
   var assetUploadFile = document.getElementById("asset-upload-file");
   var assetUploadName = document.getElementById("asset-upload-name");
@@ -158,6 +166,139 @@
     });
   }
 
+  function getShapeObjects() {
+    return canvas.getObjects().filter(function (obj) {
+      return obj && obj.pg_is_shape;
+    });
+  }
+
+  function findTextBgRect(textObj) {
+    if (!textObj || !textObj.pg_id) return null;
+    var objs = canvas.getObjects();
+    for (var i = 0; i < objs.length; i++) {
+      var obj = objs[i];
+      if (obj && obj.pg_is_text_bg && obj.pg_bg_for === textObj.pg_id) {
+        return obj;
+      }
+    }
+    return null;
+  }
+
+  function rgbaFromHex(hex, opacity) {
+    var h = (hex || "").replace("#", "");
+    if (h.length === 3) {
+      h = h.split("").map(function (c) { return c + c; }).join("");
+    }
+    var r = parseInt(h.substring(0, 2) || "00", 16);
+    var g = parseInt(h.substring(2, 4) || "00", 16);
+    var b = parseInt(h.substring(4, 6) || "00", 16);
+    var a = Math.max(0, Math.min(1, opacity == null ? 1 : opacity));
+    return "rgba(" + r + "," + g + "," + b + "," + a.toFixed(3) + ")";
+  }
+
+  function getTextBgSettings() {
+    var color = (textBgHex && textBgHex.value) || (textBgColor && textBgColor.value) || "#000000";
+    var opacity = textBgOpacity ? (parseFloat(textBgOpacity.value || "0") / 100) : 0;
+    var radiusType = textBgRadius ? textBgRadius.value : "square";
+    var radius = 0;
+    if (radiusType === "soft") radius = 8;
+    if (radiusType === "round") radius = 999;
+    return { color: color, opacity: opacity, radius: radius };
+  }
+
+  function syncTextBgControls(obj) {
+    if (!obj) return;
+    var color = obj.pg_bg_color || ((textBgHex && textBgHex.value) || "#000000");
+    var opacity = obj.pg_bg_opacity == null ? (textBgOpacity ? parseFloat(textBgOpacity.value || "0") / 100 : 0) : obj.pg_bg_opacity;
+    var radius = obj.pg_bg_radius == null ? getTextBgSettings().radius : obj.pg_bg_radius;
+    if (textBgHex) textBgHex.value = color;
+    if (textBgColor) textBgColor.value = color;
+    if (textBgOpacity) textBgOpacity.value = Math.round(opacity * 100);
+    if (textBgRadius) {
+      if (radius >= 999) textBgRadius.value = "round";
+      else if (radius > 0) textBgRadius.value = "soft";
+      else textBgRadius.value = "square";
+    }
+  }
+
+  function syncShapeControls(obj) {
+    if (!obj || !obj.pg_is_shape) return;
+    var color = obj.pg_shape_color || obj.fill || "#ffffff";
+    if (shapeHex) shapeHex.value = color;
+    if (shapeColor) shapeColor.value = color;
+    if (shapeOpacity) shapeOpacity.value = Math.round((obj.pg_shape_opacity == null ? 1 : obj.pg_shape_opacity) * 100);
+  }
+
+  function updateTextBackground(obj) {
+    if (!obj) return;
+    var rect = findTextBgRect(obj);
+    var color = obj.pg_bg_color;
+    var opacity = obj.pg_bg_opacity;
+    var radius = obj.pg_bg_radius || 0;
+    if (!color || opacity == null || opacity <= 0) {
+      if (rect) canvas.remove(rect);
+      return;
+    }
+    var box = obj.getBoundingRect(true);
+    var rx = radius >= 999 ? Math.min(box.width, box.height) / 2 : radius;
+    if (!rect) {
+      rect = new fabric.Rect({
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+        fill: rgbaFromHex(color, opacity),
+        rx: rx,
+        ry: rx,
+        selectable: false,
+        evented: false,
+        hoverCursor: "default",
+        excludeFromExport: true,
+      });
+      rect.pg_is_text_bg = true;
+      rect.pg_bg_for = obj.pg_id;
+      canvas.add(rect);
+    } else {
+      rect.set({
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+        fill: rgbaFromHex(color, opacity),
+        rx: rx,
+        ry: rx,
+      });
+    }
+    var idx = canvas.getObjects().indexOf(obj);
+    if (idx >= 1) {
+      canvas.moveTo(rect, idx - 1);
+    } else {
+      canvas.sendToBack(rect);
+    }
+    if (bgObj) canvas.sendToBack(bgObj);
+    if (guideRect) canvas.bringToFront(guideRect);
+  }
+
+  function applyTextBackgroundToSelection() {
+    var obj = getActiveText();
+    if (!obj) return;
+    var settings = getTextBgSettings();
+    obj.pg_bg_color = settings.color;
+    obj.pg_bg_opacity = settings.opacity;
+    obj.pg_bg_radius = settings.radius;
+    obj.pg_bg_radius_base_width = getGuideBounds().width;
+    updateTextBackground(obj);
+    canvas.renderAll();
+    saveState();
+    snapshotNow();
+  }
+
+  function removeTextBackground(obj) {
+    if (!obj) return;
+    var rect = findTextBgRect(obj);
+    if (rect) canvas.remove(rect);
+  }
+
   function ensureObjectId(obj) {
     if (!obj) return;
     if (!obj.pg_id) {
@@ -210,6 +351,7 @@
     if (sy !== 1) {
       obj.set({ fontSize: obj.fontSize * sy, scaleY: 1 });
     }
+    updateTextBackground(obj);
   }
 
   var fontScale = 1.0;
@@ -248,12 +390,14 @@
     if (colorSwatch && obj.fill) colorSwatch.style.background = obj.fill;
     if (alignSelect && obj.textAlign) alignSelect.value = obj.textAlign;
     syncFontSizeControls(Math.round(obj.fontSize || 12));
+    syncTextBgControls(obj);
   }
 
   function applyStyleToSelection() {
     var obj = getActiveText();
     if (!obj) return;
     applyTextStyles(obj);
+    updateTextBackground(obj);
     canvas.renderAll();
     saveState();
   }
@@ -279,14 +423,20 @@
       cornerStyle: "circle",
       transparentCorners: false,
     });
+    var bgSettings = getTextBgSettings();
+    obj.pg_bg_color = bgSettings.color;
+    obj.pg_bg_opacity = bgSettings.opacity;
+    obj.pg_bg_radius = bgSettings.radius;
+    obj.pg_bg_radius_base_width = base.width;
     ensureObjectId(obj);
     canvas.add(obj);
+    updateTextBackground(obj);
     return obj;
   }
 
   function resetTextBoxes(state) {
     canvas.getObjects().forEach(function (obj) {
-      if (obj && obj.type === "textbox") canvas.remove(obj);
+      if (obj && (obj.type === "textbox" || obj.pg_is_text_bg)) canvas.remove(obj);
     });
     var defaults = [{ text: "", box: defaultTextBox }];
     var layers = (state && state.layers && state.layers.length) ? state.layers : defaults;
@@ -303,7 +453,14 @@
             ? layer.font_size_box_norm * (box.h * base.height)
             : (layer.font_size_norm ? layer.font_size_norm * base.width : null)),
       };
-      createText(layer.text || "", box, opts);
+      var obj = createText(layer.text || "", box, opts);
+      if (obj && layer.bg_color) {
+        obj.pg_bg_color = layer.bg_color;
+        obj.pg_bg_opacity = layer.bg_opacity == null ? 0 : layer.bg_opacity;
+        obj.pg_bg_radius = layer.bg_radius_px == null ? 0 : layer.bg_radius_px;
+        obj.pg_bg_radius_base_width = layer.bg_radius_base_width || base.width;
+        updateTextBackground(obj);
+      }
     });
     var objs = getTextObjects();
     if (objs.length) canvas.setActiveObject(objs[0]);
@@ -402,6 +559,63 @@
     }, { crossOrigin: "anonymous" });
   }
 
+  function addShape(type) {
+    var base = getGuideBounds();
+    var color = (shapeHex && shapeHex.value) || (shapeColor && shapeColor.value) || "#ffffff";
+    var opacity = shapeOpacity ? (parseFloat(shapeOpacity.value || "100") / 100) : 1;
+    var width = Math.max(40, base.width * 0.25);
+    var height = Math.max(40, base.height * 0.18);
+    var left = base.left + base.width * 0.1;
+    var top = base.top + base.height * 0.1;
+    var obj = null;
+    if (type === "square") {
+      var size = Math.min(width, height);
+      obj = new fabric.Rect({ width: size, height: size, left: left, top: top });
+    } else if (type === "circle") {
+      var radius = Math.min(width, height) / 2;
+      obj = new fabric.Circle({ radius: radius, left: left, top: top });
+    } else if (type === "triangle") {
+      obj = new fabric.Triangle({ width: width, height: height, left: left, top: top });
+    } else if (type === "star") {
+      var points = [];
+      var spikes = 5;
+      var size = Math.min(width, height);
+      var outer = size / 2;
+      var inner = outer * 0.5;
+      var cx = outer;
+      var cy = outer;
+      for (var i = 0; i < spikes * 2; i++) {
+        var ang = (Math.PI / spikes) * i - Math.PI / 2;
+        var r = (i % 2 === 0) ? outer : inner;
+        points.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
+      }
+      obj = new fabric.Polygon(points, { left: left, top: top });
+    } else {
+      obj = new fabric.Rect({ width: width, height: height, left: left, top: top });
+    }
+    if (!obj) return;
+    obj.set({
+      fill: color,
+      opacity: opacity,
+      cornerColor: "#8fe4c7",
+      borderColor: "#8fe4c7",
+      transparentCorners: false,
+    });
+    obj.pg_is_shape = true;
+    obj.pg_shape_type = type;
+    obj.pg_shape_color = color;
+    obj.pg_shape_opacity = opacity;
+    ensureObjectId(obj);
+    canvas.add(obj);
+    if (bgObj) canvas.sendToBack(bgObj);
+    if (guideRect) canvas.bringToFront(guideRect);
+    canvas.setActiveObject(obj);
+    canvas.renderAll();
+    saveState();
+    snapshotNow();
+    updateLayerPanel();
+  }
+
   function updateGuideRect(bounds) {
     if (!bounds) return;
     if (!guideRect) {
@@ -433,7 +647,19 @@
 
   function snapshotNow() {
     if (historyLock) return;
-    var json = canvas.toDatalessJSON(["pg_asset_id", "pg_src", "pg_id", "pg_is_background", "pg_kv_id"]);
+    var json = canvas.toDatalessJSON([
+      "pg_asset_id",
+      "pg_src",
+      "pg_id",
+      "pg_is_background",
+      "pg_kv_id",
+      "pg_is_text_bg",
+      "pg_bg_for",
+      "pg_is_shape",
+      "pg_shape_type",
+      "pg_shape_color",
+      "pg_shape_opacity",
+    ]);
     var serialized = "";
     try {
       serialized = JSON.stringify(json);
@@ -613,6 +839,7 @@
       canvas.sendToBack(img);
       updateGuideRect(getGuideBounds());
       restoreElements(state);
+      restoreShapes(state);
       label.textContent = kv.label || kv.id;
       log("Canvas size: " + canvas.getWidth() + "x" + canvas.getHeight());
       canvas.renderAll();
@@ -680,6 +907,10 @@
         font_family: obj.fontFamily || fontSelect.value,
         color: obj.fill || colorInput.value,
         align: obj.textAlign || alignSelect.value,
+        bg_color: obj.pg_bg_color || null,
+        bg_opacity: obj.pg_bg_opacity == null ? null : obj.pg_bg_opacity,
+        bg_radius_px: obj.pg_bg_radius == null ? null : obj.pg_bg_radius,
+        bg_radius_base_width: obj.pg_bg_radius_base_width || base.width,
       });
     }
     return layers;
@@ -705,6 +936,86 @@
       });
     }
     return elements;
+  }
+
+  function collectShapes() {
+    var shapes = [];
+    var base = getGuideBounds();
+    var objs = getShapeObjects();
+    for (var i = 0; i < objs.length; i++) {
+      var obj = objs[i];
+      var rect = obj.getBoundingRect(true);
+      shapes.push({
+        shape: obj.pg_shape_type || obj.type || "rect",
+        box: {
+          x: (rect.left - base.left) / base.width,
+          y: (rect.top - base.top) / base.height,
+          w: rect.width / base.width,
+          h: rect.height / base.height,
+        },
+        color: obj.pg_shape_color || obj.fill || "#ffffff",
+        opacity: obj.pg_shape_opacity == null ? 1 : obj.pg_shape_opacity,
+      });
+    }
+    return shapes;
+  }
+
+  function restoreShapes(state) {
+    getShapeObjects().forEach(function (obj) {
+      canvas.remove(obj);
+    });
+    if (!state || !state.shapes || !state.shapes.length) return;
+    var base = getGuideBounds();
+    state.shapes.forEach(function (shape) {
+      if (!shape) return;
+      var box = normalizeBox(shape.box);
+      if (!box) return;
+      var color = shape.color || "#ffffff";
+      var opacity = shape.opacity == null ? 1 : shape.opacity;
+      var left = base.left + box.x * base.width;
+      var top = base.top + box.y * base.height;
+      var width = Math.max(1, box.w * base.width);
+      var height = Math.max(1, box.h * base.height);
+      var obj = null;
+      if (shape.shape === "circle") {
+        var radius = Math.min(width, height) / 2;
+        obj = new fabric.Circle({ radius: radius, left: left, top: top });
+      } else if (shape.shape === "triangle") {
+        obj = new fabric.Triangle({ width: width, height: height, left: left, top: top });
+      } else if (shape.shape === "star") {
+        var points = [];
+        var spikes = 5;
+        var size = Math.min(width, height);
+        var outer = size / 2;
+        var inner = outer * 0.5;
+        var cx = outer;
+        var cy = outer;
+        for (var i = 0; i < spikes * 2; i++) {
+          var ang = (Math.PI / spikes) * i - Math.PI / 2;
+          var r = (i % 2 === 0) ? outer : inner;
+          points.push({ x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r });
+        }
+        obj = new fabric.Polygon(points, { left: left, top: top });
+      } else {
+        obj = new fabric.Rect({ width: width, height: height, left: left, top: top });
+      }
+      if (!obj) return;
+      obj.set({
+        fill: color,
+        opacity: opacity,
+        cornerColor: "#8fe4c7",
+        borderColor: "#8fe4c7",
+        transparentCorners: false,
+      });
+      obj.pg_is_shape = true;
+      obj.pg_shape_type = shape.shape;
+      obj.pg_shape_color = color;
+      obj.pg_shape_opacity = opacity;
+      ensureObjectId(obj);
+      canvas.add(obj);
+      canvas.renderAll();
+      updateLayerPanel();
+    });
   }
 
   function collectImageBox() {
@@ -740,6 +1051,7 @@
     setHidden("form-font-scale", fontScale.toFixed(3));
     setHidden("form-text-layers", JSON.stringify(collectTextLayers()));
     setHidden("form-elements", JSON.stringify(collectElements()));
+    setHidden("form-shapes", JSON.stringify(collectShapes()));
     setHidden("form-guide-ratio", guideRatio);
     var imageBox = collectImageBox();
     if (imageBox) {
@@ -762,6 +1074,7 @@
       guide_ratio: guideRatio,
       image_box: collectImageBox(),
       layers: collectTextLayers(),
+      shapes: collectShapes(),
       elements: getElementObjects().map(function (obj) {
         return {
           pg_id: obj.pg_id || "",
@@ -807,7 +1120,7 @@
   function updateLayerPanel() {
     if (!layerPanel) return;
     var objs = canvas.getObjects().filter(function (obj) {
-      return obj && obj !== guideRect;
+      return obj && obj !== guideRect && !obj.pg_is_text_bg;
     });
     layerPanel.innerHTML = "";
     if (!objs.length) {
@@ -830,6 +1143,8 @@
       label.className = "label";
       if (obj.pg_is_background) {
         label.textContent = "KV";
+      } else if (obj.pg_is_shape) {
+        label.textContent = "Shape";
       } else if (obj.type === "textbox") {
         label.textContent = "Text";
       } else if (obj.type === "image") {
@@ -928,7 +1243,15 @@
     snapshotNow();
     updateLayerPanel();
   });
+  canvas.on("object:moving", function (e) {
+    if (e.target && e.target.type === "textbox") {
+      updateTextBackground(e.target);
+    }
+  });
   canvas.on("text:changed", function (e) {
+    if (e.target && e.target.type === "textbox") {
+      updateTextBackground(e.target);
+    }
     saveState();
     queueSnapshot();
   });
@@ -940,6 +1263,9 @@
   });
   canvas.on("object:removed", function (e) {
     if (e.target && e.target !== guideRect) {
+      if (e.target.type === "textbox") {
+        removeTextBackground(e.target);
+      }
       updateLayerPanel();
     }
   });
@@ -947,12 +1273,16 @@
     var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
     if (obj && obj.type === "textbox") {
       syncControlsFromSelection(obj);
+    } else if (obj && obj.pg_is_shape) {
+      syncShapeControls(obj);
     }
   });
   canvas.on("selection:updated", function (e) {
     var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
     if (obj && obj.type === "textbox") {
       syncControlsFromSelection(obj);
+    } else if (obj && obj.pg_is_shape) {
+      syncShapeControls(obj);
     }
   });
   canvas.on("selection:cleared", function () {
@@ -983,6 +1313,71 @@
       applyStyleToSelection();
     });
   }
+  if (textBgHex) {
+    textBgHex.addEventListener("change", function () {
+      if (textBgColor) textBgColor.value = textBgHex.value;
+      applyTextBackgroundToSelection();
+    });
+  }
+  if (textBgColor) {
+    textBgColor.addEventListener("input", function () {
+      if (textBgHex) textBgHex.value = textBgColor.value;
+      applyTextBackgroundToSelection();
+    });
+  }
+  if (textBgOpacity) {
+    textBgOpacity.addEventListener("input", function () {
+      applyTextBackgroundToSelection();
+    });
+  }
+  if (textBgRadius) {
+    textBgRadius.addEventListener("change", function () {
+      applyTextBackgroundToSelection();
+    });
+  }
+  if (shapeHex) {
+    shapeHex.addEventListener("change", function () {
+      if (shapeColor) shapeColor.value = shapeHex.value;
+      var obj = getActiveObject();
+      if (obj && obj.pg_is_shape) {
+        obj.pg_shape_color = shapeHex.value;
+        obj.set({ fill: shapeHex.value });
+        canvas.renderAll();
+        saveState();
+      }
+    });
+  }
+  if (shapeColor) {
+    shapeColor.addEventListener("input", function () {
+      if (shapeHex) shapeHex.value = shapeColor.value;
+      var obj = getActiveObject();
+      if (obj && obj.pg_is_shape) {
+        obj.pg_shape_color = shapeColor.value;
+        obj.set({ fill: shapeColor.value });
+        canvas.renderAll();
+        saveState();
+      }
+    });
+  }
+  if (shapeOpacity) {
+    shapeOpacity.addEventListener("input", function () {
+      var obj = getActiveObject();
+      if (obj && obj.pg_is_shape) {
+        obj.pg_shape_opacity = parseFloat(shapeOpacity.value || "100") / 100;
+        obj.set({ opacity: obj.pg_shape_opacity });
+        canvas.renderAll();
+        saveState();
+      }
+    });
+  }
+  if (shapeButtons && shapeButtons.length) {
+    for (var i = 0; i < shapeButtons.length; i++) {
+      shapeButtons[i].addEventListener("click", function (e) {
+        var t = e.currentTarget.getAttribute("data-shape");
+        addShape(t || "rect");
+      });
+    }
+  }
   alignSelect.addEventListener("change", updateAllStyles);
   function applyFontSizeValue(next) {
     var obj = getActiveText();
@@ -991,6 +1386,7 @@
     if (fontSizeCustom) fontSizeCustom.value = String(size);
     if (!obj) return;
     obj.set({ fontSize: size });
+    updateTextBackground(obj);
     canvas.renderAll();
     saveState();
   }
@@ -1039,6 +1435,9 @@
     } else if (e.key === "Delete" || e.key === "Backspace") {
       if (obj.pg_is_background) {
         return;
+      }
+      if (obj.type === "textbox") {
+        removeTextBackground(obj);
       }
       canvas.remove(obj);
       canvas.discardActiveObject();
@@ -1107,6 +1506,10 @@
     btnDeleteText.addEventListener("click", function () {
       var obj = getActiveObject();
       if (!obj) return;
+      if (obj.pg_is_background) return;
+      if (obj.type === "textbox") {
+        removeTextBackground(obj);
+      }
       canvas.remove(obj);
       canvas.discardActiveObject();
       canvas.renderAll();
@@ -1120,8 +1523,17 @@
       if (!obj) return;
       obj.clone(function (cloned) {
         cloned.set({ left: obj.left + 12, top: obj.top + 12 });
+        if (cloned.type === "textbox") {
+          cloned.pg_bg_color = obj.pg_bg_color;
+          cloned.pg_bg_opacity = obj.pg_bg_opacity;
+          cloned.pg_bg_radius = obj.pg_bg_radius;
+          cloned.pg_bg_radius_base_width = obj.pg_bg_radius_base_width;
+        }
         canvas.add(cloned);
         canvas.setActiveObject(cloned);
+        if (cloned.type === "textbox") {
+          updateTextBackground(cloned);
+        }
         canvas.renderAll();
         saveState();
         snapshotNow();
@@ -1161,6 +1573,10 @@
         addTextBox(texts[i], defaultCopyBoxes[i] || defaultTextBox, { offsetPx: 0 });
       }
     }
+    objs = getTextObjects();
+    objs.forEach(function (obj) {
+      updateTextBackground(obj);
+    });
     canvas.renderAll();
     saveState();
     snapshotNow();
@@ -1198,6 +1614,15 @@
           font_base_width: layer.font_base_width || null,
           font_size_box_norm: layer.font_size_box_norm || layer.font_size_norm || null,
         });
+      }),
+      shapes: (layoutData.shapes || []).map(function (shape) {
+        if (!shape) return shape;
+        return {
+          shape: shape.shape || shape.type || "rect",
+          box: normalizeBox(shape.box || null),
+          color: shape.color || "#ffffff",
+          opacity: shape.opacity == null ? 1 : shape.opacity,
+        };
       }),
       elements: (layoutData.elements || []).map(function (el) {
         if (!el) return el;

@@ -123,6 +123,43 @@
 
           <div class="field-row" style="margin-top:8px;">
             <button class="btn btn-icon" id="btn-insert-text" type="button" title="Insert text box">T</button>
+            <details id="text-bg-menu" class="asset-menu">
+              <summary class="btn btn-icon" title="Text background">BG</summary>
+              <div class="panel asset-menu-content">
+                <div class="muted">Text background</div>
+                <div class="field-row" style="margin-top:8px;">
+                  <input type="color" id="text-bg-color" value="#000000" />
+                  <input type="text" id="text-bg-hex" value="#000000" placeholder="#000000" />
+                </div>
+                <label>Opacity</label>
+                <input type="range" id="text-bg-opacity" min="0" max="100" value="0" />
+                <label>Corner</label>
+                <select id="text-bg-radius">
+                  <option value="square">square</option>
+                  <option value="soft" selected>slightly rounded</option>
+                  <option value="round">very rounded</option>
+                </select>
+              </div>
+            </details>
+            <details id="shape-menu" class="asset-menu">
+              <summary class="btn btn-icon" title="Insert shape">⬛</summary>
+              <div class="panel asset-menu-content">
+                <div class="muted">Insert shape</div>
+                <div class="field-row" style="margin-top:8px;">
+                  <input type="color" id="shape-color" value="#ffffff" />
+                  <input type="text" id="shape-hex" value="#ffffff" placeholder="#ffffff" />
+                </div>
+                <label>Opacity</label>
+                <input type="range" id="shape-opacity" min="0" max="100" value="100" />
+                <div class="field-row" style="margin-top:10px; flex-wrap:wrap;">
+                  <button class="btn" type="button" data-shape="square">Square</button>
+                  <button class="btn" type="button" data-shape="rect">Rectangle</button>
+                  <button class="btn" type="button" data-shape="circle">Circle</button>
+                  <button class="btn" type="button" data-shape="triangle">Triangle</button>
+                  <button class="btn" type="button" data-shape="star">Star</button>
+                </div>
+              </div>
+            </details>
             <details id="asset-menu" class="asset-menu">
               <summary class="btn btn-icon" title="Insert asset">A</summary>
               <div class="panel asset-menu-content">
@@ -304,6 +341,7 @@
             <input type="hidden" name="kv_asset_id" id="form-kv" />
             <input type="hidden" name="text_layers" id="form-text-layers" />
             <input type="hidden" name="elements" id="form-elements" />
+            <input type="hidden" name="shapes" id="form-shapes" />
             <input type="hidden" name="image_box" id="form-image-box" />
             <input type="hidden" name="guide_ratio" id="form-guide-ratio" />
             <input type="hidden" name="font_family" id="form-font" />
@@ -410,6 +448,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=26"></script>
+    <script src="/static/editor.js?v=27"></script>
   </body>
 </html>

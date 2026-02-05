@@ -155,4 +155,8 @@
 - **2026-02-05 > src/performance_genai/api/static/editor.js > collectAndSubmit/applyGuide > show loader on submit and display active ratio label**
 - **2026-02-05 > src/performance_genai/api/static/editor.js > normalizeBox/restoreElements/layoutState > handle list-form boxes so assets stay in place when opening ratio layouts**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v26**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add text background and shape controls plus shapes payload in preview form; bump editor.js cache buster to v27**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > text background/shape controls > add text background styling, shape insertion, and preview payload support**
+- **2026-02-05 > src/performance_genai/api/app.py > preview_text_layout/outpaint_layout > persist shapes and pass them into preview/outpaint rendering**
+- **2026-02-05 > src/performance_genai/assembly/render.py > render_text_layers/render_text_layout > draw shapes and text background boxes during preview rendering**
 - **2026-02-05 > src/performance_genai/api/app.py > delete_asset/bulk_delete_assets/outpaint_layout > cascade-delete outpainted KV assets when removing previews**
