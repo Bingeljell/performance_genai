@@ -153,4 +153,6 @@
 - **2026-02-05 > src/performance_genai/api/app.py > editor_page > include derived KVs so outpainted layouts can open in the editor**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add loader overlay, ratio label, and fix outpaint button submission; bump cache buster to v25**
 - **2026-02-05 > src/performance_genai/api/static/editor.js > collectAndSubmit/applyGuide > show loader on submit and display active ratio label**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > normalizeBox/restoreElements/layoutState > handle list-form boxes so assets stay in place when opening ratio layouts**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v26**
 - **2026-02-05 > src/performance_genai/api/app.py > delete_asset/bulk_delete_assets/outpaint_layout > cascade-delete outpainted KV assets when removing previews**

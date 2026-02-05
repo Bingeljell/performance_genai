@@ -184,6 +184,17 @@
     return { w: w, h: h };
   }
 
+  function normalizeBox(box) {
+    if (!box) return null;
+    if (Array.isArray(box) && box.length >= 4) {
+      return { x: box[0], y: box[1], w: box[2], h: box[3] };
+    }
+    if (typeof box.x === "number" && typeof box.y === "number") {
+      return box;
+    }
+    return null;
+  }
+
   function getGuideBounds() {
     if (guideBounds && guideBounds.width && guideBounds.height) return guideBounds;
     return { left: 0, top: 0, width: canvasSize.w, height: canvasSize.h };
@@ -322,7 +333,7 @@
     var base = getGuideBounds();
     state.elements.forEach(function (el) {
       if (!el || !el.src) return;
-      var box = el.box || null;
+      var box = normalizeBox(el.box);
       fabric.Image.fromURL(el.src, function (img) {
         var left = el.left || 0;
         var top = el.top || 0;
@@ -505,9 +516,10 @@
       width: guideW,
       height: guideH,
     };
-    if (state && state.image_box && typeof state.image_box.x === "number" && typeof state.image_box.y === "number") {
-      nextOffset.x = Math.round(nextGuide.left + state.image_box.x * nextGuide.width);
-      nextOffset.y = Math.round(nextGuide.top + state.image_box.y * nextGuide.height);
+    var imageBox = normalizeBox(state && state.image_box ? state.image_box : null);
+    if (imageBox) {
+      nextOffset.x = Math.round(nextGuide.left + imageBox.x * nextGuide.width);
+      nextOffset.y = Math.round(nextGuide.top + imageBox.y * nextGuide.height);
     }
     guideBounds = nextGuide;
 
@@ -1175,7 +1187,7 @@
     }
     guideRatio = (guideSelect && guideSelect.value) || guideRatio;
     var layoutState = {
-      image_box: layoutData.image_box || null,
+      image_box: normalizeBox(layoutData.image_box || null),
       layers: (layoutData.text_layers || []).map(function (layer) {
         if (!layer || !layer.box) return layer;
         var b = layer.box;
@@ -1192,7 +1204,7 @@
         return {
           asset_id: el.asset_id,
           src: (el.asset_id ? ("/projects/" + projectId + "/assets/" + el.asset_id) : (el.src || "")),
-          box: el.box || null,
+          box: normalizeBox(el.box || null),
           opacity: el.opacity == null ? 1 : el.opacity,
         };
       }),
