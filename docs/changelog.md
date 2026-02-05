@@ -142,3 +142,6 @@
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > rename Creative Controls and compact color picker to a square swatch**
 - **2026-02-05 > src/performance_genai/api/static/editor.js > n/a > add Cmd/Ctrl+Z keyboard undo shortcut**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > remove bring forward/send back buttons in favor of layer panel**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > applyGuide/setBackground/collectImageBox > add oversized canvas padding and make KV background movable within the canvas**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > saveState/restoreHistory > persist background position via image_box and restore KV object on undo**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > remove static KV img tag and bump editor.js cache buster to v24**

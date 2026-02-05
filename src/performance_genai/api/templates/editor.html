@@ -315,7 +315,6 @@
                 <span class="muted" id="kv-label">No visual selected</span>
               </div>
               <div id="canvas-stage" style="position: relative; display: inline-block;">
-                <img id="kv-bg" alt="kv background" style="display:block; max-width: 900px; border-radius: 10px;" />
                 <canvas id="editor-canvas" width="900" height="900"></canvas>
               </div>
             </div>
@@ -387,6 +386,6 @@
     {% if editor_layout %}
       <script id="layout-data" type="application/json">{{ editor_layout | tojson }}</script>
     {% endif %}
-    <script src="/static/editor.js?v=23"></script>
+    <script src="/static/editor.js?v=24"></script>
   </body>
 </html>
