@@ -104,3 +104,7 @@
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > replace undo button label with icon glyph**
 - **2026-02-04 > src/performance_genai/api/static/editor.js > normalizeObjectScale > avoid scaling non-text objects to prevent image skew on selection**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > update undo icon glyph**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add layers panel UI and preview elements payload field; bump cache buster to v20**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > collect element layers for previews, add layer panel with up/down controls, and include object ids in undo history**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > parse element payloads and composite them into previews**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout/render_text_layers/_apply_elements > composite element images into preview render**

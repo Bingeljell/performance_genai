@@ -585,6 +585,7 @@ async def preview_text_layout(
     kv_asset_id: str = Form(...),
     text_layers: str = Form(""),
     image_box: str = Form(""),
+    elements: str = Form(""),
     headline: str = Form(""),
     subhead: str = Form(""),
     cta: str = Form("Learn more"),
@@ -635,6 +636,15 @@ async def preview_text_layout(
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=400, detail=f"image_box must be JSON object: {exc}") from exc
 
+    elements_payload: list[dict] = []
+    if elements.strip():
+        try:
+            parsed = json.loads(elements)
+            if isinstance(parsed, list):
+                elements_payload = parsed
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"elements must be JSON list: {exc}") from exc
+
     headline_box = _parse_box_from_form(headline_x, headline_y, headline_w, headline_h, (0.06, 0.60, 0.88, 0.16))
     subhead_box = _parse_box_from_form(subhead_x, subhead_y, subhead_w, subhead_h, (0.06, 0.76, 0.88, 0.08))
     cta_box = _parse_box_from_form(cta_x, cta_y, cta_w, cta_h, (0.06, 0.86, 0.50, 0.10))
@@ -673,6 +683,45 @@ async def preview_text_layout(
         size = settings.master_sizes.get(ratio)
         if not size:
             continue
+        render_elements: list[dict] = []
+        if elements_payload:
+            for el in elements_payload:
+                if not isinstance(el, dict):
+                    continue
+                asset_id = (el.get("asset_id") or "").strip()
+                if not asset_id:
+                    continue
+                asset = next(
+                    (a for a in proj.assets if a.asset_id == asset_id and a.kind in ("element", "motif", "product")),
+                    None,
+                )
+                if not asset:
+                    continue
+                path = store.abs_asset_path(project_id, asset)
+                if not path.exists():
+                    continue
+                try:
+                    img = Image.open(path).convert("RGBA")
+                except Exception:
+                    continue
+                box = el.get("box") if isinstance(el.get("box"), dict) else {}
+                try:
+                    box_norm = (
+                        float(box.get("x", 0)),
+                        float(box.get("y", 0)),
+                        float(box.get("w", 0)),
+                        float(box.get("h", 0)),
+                    )
+                except (TypeError, ValueError):
+                    continue
+                render_elements.append(
+                    {
+                        "image": img,
+                        "box": box_norm,
+                        "opacity": float(el.get("opacity", 1) or 1),
+                    }
+                )
+
         if use_layers:
             rendered = render_text_layers(
                 kv=kv_img,
@@ -682,6 +731,7 @@ async def preview_text_layout(
                 text_color_hex=text_color,
                 text_align=text_align,
                 image_box=image_box_payload,
+                elements=render_elements,
             )
         else:
             rendered = render_text_layout(
@@ -698,6 +748,7 @@ async def preview_text_layout(
                 text_align=text_align,
                 font_scale=float(font_scale),
                 image_box=image_box_payload,
+                elements=render_elements,
             )
         out_bytes = _pil_to_png_bytes(rendered.image)
         label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename
@@ -734,6 +785,7 @@ async def preview_text_layout(
                 "ratios": ["1:1", "4:5", "9:16"],
                 "text_layers": len(layers_payload) if use_layers else None,
                 "image_box": image_box_payload,
+                "elements": len(elements_payload),
             },
             "outputs": {"preview_asset_ids": preview_ids},
         },

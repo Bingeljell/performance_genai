@@ -64,6 +64,7 @@
   var btnSendBack = document.getElementById("btn-send-back");
   var copyButtons = document.querySelectorAll(".use-copy-set");
   var assetInsertButtons = document.querySelectorAll("[data-insert-asset]");
+  var layerPanel = document.getElementById("layer-panel");
 
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
@@ -134,6 +135,13 @@
     return canvas.getObjects().filter(function (obj) {
       return obj && obj.type === "image" && obj.pg_asset_id;
     });
+  }
+
+  function ensureObjectId(obj) {
+    if (!obj) return;
+    if (!obj.pg_id) {
+      obj.pg_id = "obj_" + Math.random().toString(36).slice(2, 10);
+    }
   }
 
   function getActiveText() {
@@ -239,6 +247,7 @@
       cornerStyle: "circle",
       transparentCorners: false,
     });
+    ensureObjectId(obj);
     canvas.add(obj);
     return obj;
   }
@@ -300,8 +309,11 @@
         });
         img.pg_asset_id = el.asset_id || el.pg_asset_id || "";
         img.pg_src = el.src;
+        img.pg_id = el.pg_id || null;
+        ensureObjectId(img);
         canvas.add(img);
         canvas.renderAll();
+        updateLayerPanel();
       }, { crossOrigin: "anonymous" });
     });
   }
@@ -326,6 +338,7 @@
       });
       img.pg_asset_id = assetId || "";
       img.pg_src = url;
+      ensureObjectId(img);
       canvas.add(img);
       canvas.setActiveObject(img);
       canvas.renderAll();
@@ -365,7 +378,7 @@
 
   function snapshotNow() {
     if (historyLock) return;
-    var json = canvas.toDatalessJSON(["pg_asset_id", "pg_src"]);
+    var json = canvas.toDatalessJSON(["pg_asset_id", "pg_src", "pg_id"]);
     var serialized = "";
     try {
       serialized = JSON.stringify(json);
@@ -401,6 +414,7 @@
       canvas.renderAll();
       historyLock = false;
       saveState();
+      updateLayerPanel();
     });
   }
 
@@ -566,6 +580,28 @@
     return layers;
   }
 
+  function collectElements() {
+    var elements = [];
+    var base = getGuideBounds();
+    var objs = getElementObjects();
+    for (var i = 0; i < objs.length; i++) {
+      var obj = objs[i];
+      var rect = obj.getBoundingRect(true);
+      elements.push({
+        asset_id: obj.pg_asset_id || "",
+        src: obj.pg_src || "",
+        box: {
+          x: clamp01((rect.left - base.left) / base.width),
+          y: clamp01((rect.top - base.top) / base.height),
+          w: clamp01(rect.width / base.width),
+          h: clamp01(rect.height / base.height),
+        },
+        opacity: obj.opacity == null ? 1 : obj.opacity,
+      });
+    }
+    return elements;
+  }
+
   function collectImageBox() {
     var base = getGuideBounds();
     if (!base || !base.width || !base.height) {
@@ -588,6 +624,7 @@
     setHidden("form-align", alignSelect.value);
     setHidden("form-font-scale", fontScale.toFixed(3));
     setHidden("form-text-layers", JSON.stringify(collectTextLayers()));
+    setHidden("form-elements", JSON.stringify(collectElements()));
     var imageBox = collectImageBox();
     if (imageBox) {
       setHidden("form-image-box", JSON.stringify(imageBox));
@@ -607,6 +644,7 @@
       layers: collectTextLayers(),
       elements: getElementObjects().map(function (obj) {
         return {
+          pg_id: obj.pg_id || "",
           asset_id: obj.pg_asset_id || "",
           src: obj.pg_src || obj.src,
           left: obj.left || 0,
@@ -646,6 +684,101 @@
     });
   }
 
+  function updateLayerPanel() {
+    if (!layerPanel) return;
+    var objs = canvas.getObjects().filter(function (obj) {
+      return obj && obj !== guideRect;
+    });
+    layerPanel.innerHTML = "";
+    if (!objs.length) {
+      layerPanel.innerHTML = "<div class=\"muted\">No layers yet.</div>";
+      return;
+    }
+    // Top-most first.
+    var active = canvas.getActiveObject();
+    var activeId = active && active.pg_id;
+    for (var i = objs.length - 1; i >= 0; i--) {
+      var obj = objs[i];
+      ensureObjectId(obj);
+      var row = document.createElement("div");
+      row.className = "layer-row";
+      if (activeId && obj.pg_id === activeId) {
+        row.classList.add("active");
+      }
+      row.dataset.objId = obj.pg_id;
+      var label = document.createElement("div");
+      label.className = "label";
+      if (obj.type === "textbox") {
+        label.textContent = "Text";
+      } else if (obj.type === "image") {
+        label.textContent = obj.pg_asset_id ? ("Asset " + obj.pg_asset_id.slice(0, 6)) : "Asset";
+      } else {
+        label.textContent = obj.type || "Layer";
+      }
+      var controls = document.createElement("div");
+      controls.className = "layer-controls";
+      var up = document.createElement("button");
+      up.className = "btn btn-icon";
+      up.type = "button";
+      up.title = "Bring forward";
+      up.textContent = "↑";
+      var down = document.createElement("button");
+      down.className = "btn btn-icon";
+      down.type = "button";
+      down.title = "Send back";
+      down.textContent = "↓";
+      controls.appendChild(up);
+      controls.appendChild(down);
+
+      row.appendChild(label);
+      row.appendChild(controls);
+
+      row.addEventListener("click", function (e) {
+        if (e.target && e.target.tagName === "BUTTON") return;
+        var id = this.dataset.objId;
+        var target = canvas.getObjects().find(function (o) {
+          return o.pg_id === id;
+        });
+        if (target) {
+          canvas.setActiveObject(target);
+          canvas.renderAll();
+          syncControlsFromSelection(target);
+          updateLayerPanel();
+        }
+      });
+      up.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var id = this.parentNode.parentNode.dataset.objId;
+        var target = canvas.getObjects().find(function (o) {
+          return o.pg_id === id;
+        });
+        if (target) {
+          canvas.bringForward(target);
+          if (guideRect) canvas.sendToBack(guideRect);
+          canvas.renderAll();
+          saveState();
+          updateLayerPanel();
+        }
+      });
+      down.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var id = this.parentNode.parentNode.dataset.objId;
+        var target = canvas.getObjects().find(function (o) {
+          return o.pg_id === id;
+        });
+        if (target) {
+          canvas.sendBackwards(target);
+          if (guideRect) canvas.sendToBack(guideRect);
+          canvas.renderAll();
+          saveState();
+          updateLayerPanel();
+        }
+      });
+
+      layerPanel.appendChild(row);
+    }
+  }
+
   function isEditableTarget(target) {
     if (!target) return false;
     var tag = (target.tagName || "").toLowerCase();
@@ -660,10 +793,22 @@
     canvas.renderAll();
     saveState();
     snapshotNow();
+    updateLayerPanel();
   });
   canvas.on("text:changed", function (e) {
     saveState();
     queueSnapshot();
+  });
+  canvas.on("object:added", function (e) {
+    if (e.target && e.target !== guideRect) {
+      ensureObjectId(e.target);
+      updateLayerPanel();
+    }
+  });
+  canvas.on("object:removed", function (e) {
+    if (e.target && e.target !== guideRect) {
+      updateLayerPanel();
+    }
   });
   canvas.on("selection:created", function (e) {
     var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
@@ -675,6 +820,13 @@
     var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
     if (obj && obj.type === "textbox") {
       syncControlsFromSelection(obj);
+    }
+  });
+  canvas.on("selection:cleared", function () {
+    if (!layerPanel) return;
+    var rows = layerPanel.querySelectorAll(".layer-row");
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.remove("active");
     }
   });
 

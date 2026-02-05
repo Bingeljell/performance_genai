@@ -103,12 +103,15 @@ def render_text_layout(
     text_align: str = "left",
     font_scale: float = 1.0,
     image_box: dict | None = None,
+    elements: list[dict] | None = None,
 ) -> RenderedMaster:
     """
     Deterministic text overlay for editor previews.
     Boxes are normalized (x, y, w, h) in 0..1 coordinates.
     """
     base = _render_base_image(kv, size, image_box=image_box)
+    if elements:
+        _apply_elements(base, size, elements)
     draw = ImageDraw.Draw(base)
 
     align = (text_align or "left").strip().lower()
@@ -169,6 +172,7 @@ def render_text_layers(
     text_color_hex: str,
     text_align: str = "left",
     image_box: dict | None = None,
+    elements: list[dict] | None = None,
 ) -> RenderedMaster:
     """
     Render multiple text boxes using absolute font sizes from the editor.
@@ -179,6 +183,8 @@ def render_text_layers(
       - font_family, color, align (optional overrides)
     """
     base = _render_base_image(kv, size, image_box=image_box)
+    if elements:
+        _apply_elements(base, size, elements)
     draw = ImageDraw.Draw(base)
 
     default_align = (text_align or "left").strip().lower()
@@ -334,6 +340,43 @@ def _render_base_image(
     resized = kv.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
     base.paste(resized, (px, py), resized)
     return base
+
+
+def _apply_elements(base: Image.Image, size: tuple[int, int], elements: list[dict]) -> None:
+    tw, th = size
+    for el in elements:
+        if not isinstance(el, dict):
+            continue
+        img = el.get("image")
+        if not isinstance(img, Image.Image):
+            continue
+        box = el.get("box")
+        if not isinstance(box, (list, tuple)) or len(box) != 4:
+            continue
+        try:
+            x, y, w, h = [float(v) for v in box]
+        except (TypeError, ValueError):
+            continue
+        if w <= 0 or h <= 0:
+            continue
+        x1 = int(x * tw)
+        y1 = int(y * th)
+        w_px = max(1, int(w * tw))
+        h_px = max(1, int(h * th))
+        try:
+            layer = img.resize((w_px, h_px), Image.Resampling.LANCZOS).convert("RGBA")
+        except Exception:
+            continue
+        opacity = el.get("opacity")
+        if opacity is not None:
+            try:
+                alpha = max(0.0, min(1.0, float(opacity)))
+                if alpha < 1:
+                    a = layer.getchannel("A").point(lambda p: int(p * alpha))
+                    layer.putalpha(a)
+            except Exception:
+                pass
+        base.paste(layer, (x1, y1), layer)
 
 
 def _norm_box_to_px(

@@ -39,6 +39,12 @@
       .asset-menu-content { display: none; position: absolute; top: 44px; left: 0; width: 360px; z-index: 60; background: #0f1a16; }
       .asset-menu[open] .asset-menu-content { display: block; }
       .asset-menu-content .grid { max-height: 320px; overflow: auto; }
+      .layer-list { display:flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+      .layer-row { display:flex; align-items:center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: rgba(0,0,0,0.18); cursor: pointer; }
+      .layer-row:hover { background: rgba(255,255,255,0.06); }
+      .layer-row.active { border-color: rgba(143,228,199,0.5); background: rgba(143,228,199,0.12); }
+      .layer-row .label { font-size: 12px; color: var(--muted); }
+      .layer-controls { display:flex; gap: 6px; }
       canvas { border-radius: 10px; background: transparent; }
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
       .thumb { width: 100%; height: auto; object-fit: contain; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.22); }
@@ -197,6 +203,9 @@
 
           <div class="muted" style="margin-top:10px;">Drag and resize text boxes on the canvas. Use handles to scale.</div>
           <div class="muted" style="margin-top:6px;">Arrow keys nudge selected text (Shift = 10px).</div>
+
+          <label>Layers</label>
+          <div id="layer-panel" class="layer-list"></div>
           <button class="btn" id="btn-preview" type="button" style="margin-top:10px;">Generate previews (1:1, 4:5, 9:16)</button>
 
           <div style="margin-top:16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.10);">
@@ -266,6 +275,7 @@
           <form id="preview-form" method="post" action="/projects/{{ project.project_id }}/layouts/preview">
             <input type="hidden" name="kv_asset_id" id="form-kv" />
             <input type="hidden" name="text_layers" id="form-text-layers" />
+            <input type="hidden" name="elements" id="form-elements" />
             <input type="hidden" name="image_box" id="form-image-box" />
             <input type="hidden" name="font_family" id="form-font" />
             <input type="hidden" name="text_color" id="form-color" />
@@ -340,6 +350,6 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=19"></script>
+    <script src="/static/editor.js?v=20"></script>
   </body>
 </html>
