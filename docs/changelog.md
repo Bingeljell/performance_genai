@@ -139,3 +139,6 @@
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add horizontal logo and expand editor layout to full viewport width**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > prevent page-level horizontal scroll by constraining canvas wrap overflow**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > apply border-box sizing to avoid width overflow and clipped labels**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > rename Creative Controls and compact color picker to a square swatch**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > n/a > add Cmd/Ctrl+Z keyboard undo shortcut**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > remove bring forward/send back buttons in favor of layer panel**

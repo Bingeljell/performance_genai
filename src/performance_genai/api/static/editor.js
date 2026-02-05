@@ -929,6 +929,11 @@
 
   document.addEventListener("keydown", function (e) {
     if (isEditableTarget(e.target)) return;
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
+      undo();
+      e.preventDefault();
+      return;
+    }
     var obj = getActiveObject();
     if (!obj) return;
     if (obj.isEditing) return;
