@@ -212,14 +212,21 @@ def render_text_layers(
         x1, y1, x2, y2 = px_box
         max_w = max(1, x2 - x1)
 
-        font_size_norm = layer.get("font_size_norm")
-        if font_size_norm is None:
-            font_px = max(12, int((y2 - y1) * 0.5))
-        else:
+        font_size_box_norm = layer.get("font_size_box_norm")
+        if font_size_box_norm is not None:
             try:
-                font_px = max(10, int(float(font_size_norm) * size[0]))
+                font_px = max(10, int(float(font_size_box_norm) * (y2 - y1)))
             except (TypeError, ValueError):
                 font_px = max(12, int((y2 - y1) * 0.5))
+        else:
+            font_size_norm = layer.get("font_size_norm")
+            if font_size_norm is None:
+                font_px = max(12, int((y2 - y1) * 0.5))
+            else:
+                try:
+                    font_px = max(10, int(float(font_size_norm) * size[0]))
+                except (TypeError, ValueError):
+                    font_px = max(12, int((y2 - y1) * 0.5))
 
         layer_font_family = layer.get("font_family") or font_family
         font = _load_font(font_px, font_family=layer_font_family)
@@ -460,6 +467,18 @@ def _load_font(size: int, font_family: str | None = None) -> ImageFont.FreeTypeF
         from pathlib import Path
 
         for c in candidates:
+            p = Path(c)
+            if p.exists():
+                return ImageFont.truetype(str(p), size=size)
+        fallback = [
+            "/System/Library/Fonts/Supplemental/Helvetica.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "/Library/Fonts/Arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "C:\\\\Windows\\\\Fonts\\\\arial.ttf",
+        ]
+        for c in fallback:
             p = Path(c)
             if p.exists():
                 return ImageFont.truetype(str(p), size=size)

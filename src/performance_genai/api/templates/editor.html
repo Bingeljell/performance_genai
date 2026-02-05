@@ -277,6 +277,7 @@
             <input type="hidden" name="text_layers" id="form-text-layers" />
             <input type="hidden" name="elements" id="form-elements" />
             <input type="hidden" name="image_box" id="form-image-box" />
+            <input type="hidden" name="guide_ratio" id="form-guide-ratio" />
             <input type="hidden" name="font_family" id="form-font" />
             <input type="hidden" name="text_color" id="form-color" />
             <input type="hidden" name="text_align" id="form-align" />
@@ -317,10 +318,16 @@
                     {% for a in text_previews[:9] %}
                       <div class="item">
                         <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
-                        <div class="k">
-                          <small class="muted">{{ a.metadata.ratio }}</small>
-                          <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                        </div>
+                      <div class="k">
+                        <small class="muted">{{ a.metadata.ratio }}</small>
+                        <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                      </div>
+                      {% if a.metadata.debug_text_layers %}
+                        <details style="margin-top:6px;">
+                          <summary class="muted">debug</summary>
+                          <pre style="white-space: pre-wrap; font-size: 11px; color: rgba(255,255,255,0.78);">{{ a.metadata.debug_text_layers | tojson }}</pre>
+                        </details>
+                      {% endif %}
                         <div class="k">
                           <label class="muted" style="display:flex; align-items:center; gap:6px;">
                             <input type="checkbox" class="preview-select" name="asset_ids" value="{{ a.asset_id }}" />
@@ -350,6 +357,6 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=20"></script>
+    <script src="/static/editor.js?v=22"></script>
   </body>
 </html>

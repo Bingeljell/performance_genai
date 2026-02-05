@@ -110,3 +110,12 @@
 - **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout/render_text_layers/_apply_elements > composite element images into preview render**
 - **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers/resetTextBoxes > normalize font size to guide width for consistent sizing across ratios**
 - **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers/_apply_elements > scale text by target width and preserve element aspect ratio across ratio previews**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers > include font_size_box_norm to stabilize preview font sizing across ratios**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers > prefer box-relative font sizing when provided to prevent tiny text**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers/collectElements > stop clamping boxes so out-of-frame text/assets keep their true size in previews**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add guide_ratio hidden field and bump editor.js cache buster to v21**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectAndSubmit > include guide_ratio in preview payload**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > persist master + per-ratio layout files (eager) and include ratio_layout_id in preview metadata**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > include debug metadata for text layer boxes and image/guide context on previews**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > show per-preview debug layer dump and bump cache buster to v22**
+- **2026-02-04 > src/performance_genai/assembly/render.py > _load_font > add cross-platform fallback fonts so previews don't use tiny default bitmap font**

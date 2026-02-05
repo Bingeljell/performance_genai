@@ -566,12 +566,13 @@
       layers.push({
         text: obj.text || "",
         box: {
-          x: clamp01((rect.left - base.left) / base.width),
-          y: clamp01((rect.top - base.top) / base.height),
-          w: clamp01(rect.width / base.width),
-          h: clamp01(rect.height / base.height),
+          x: (rect.left - base.left) / base.width,
+          y: (rect.top - base.top) / base.height,
+          w: rect.width / base.width,
+          h: rect.height / base.height,
         },
         font_size_norm: (obj.fontSize || 12) / base.width,
+        font_size_box_norm: (obj.fontSize || 12) / Math.max(1, rect.height),
         font_family: obj.fontFamily || fontSelect.value,
         color: obj.fill || colorInput.value,
         align: obj.textAlign || alignSelect.value,
@@ -591,10 +592,10 @@
         asset_id: obj.pg_asset_id || "",
         src: obj.pg_src || "",
         box: {
-          x: clamp01((rect.left - base.left) / base.width),
-          y: clamp01((rect.top - base.top) / base.height),
-          w: clamp01(rect.width / base.width),
-          h: clamp01(rect.height / base.height),
+          x: (rect.left - base.left) / base.width,
+          y: (rect.top - base.top) / base.height,
+          w: rect.width / base.width,
+          h: rect.height / base.height,
         },
         opacity: obj.opacity == null ? 1 : obj.opacity,
       });
@@ -625,6 +626,7 @@
     setHidden("form-font-scale", fontScale.toFixed(3));
     setHidden("form-text-layers", JSON.stringify(collectTextLayers()));
     setHidden("form-elements", JSON.stringify(collectElements()));
+    setHidden("form-guide-ratio", guideRatio);
     var imageBox = collectImageBox();
     if (imageBox) {
       setHidden("form-image-box", JSON.stringify(imageBox));

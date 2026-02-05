@@ -586,6 +586,7 @@ async def preview_text_layout(
     text_layers: str = Form(""),
     image_box: str = Form(""),
     elements: str = Form(""),
+    guide_ratio: str = Form(""),
     headline: str = Form(""),
     subhead: str = Form(""),
     cta: str = Form("Learn more"),
@@ -649,19 +650,51 @@ async def preview_text_layout(
     subhead_box = _parse_box_from_form(subhead_x, subhead_y, subhead_w, subhead_h, (0.06, 0.76, 0.88, 0.08))
     cta_box = _parse_box_from_form(cta_x, cta_y, cta_w, cta_h, (0.06, 0.86, 0.50, 0.10))
 
+    elements_layout: list[dict] = []
+    if elements_payload:
+        for el in elements_payload:
+            if not isinstance(el, dict):
+                continue
+            asset_id = (el.get("asset_id") or "").strip()
+            if not asset_id:
+                continue
+            box = el.get("box") if isinstance(el.get("box"), dict) else {}
+            try:
+                box_norm = (
+                    float(box.get("x", 0)),
+                    float(box.get("y", 0)),
+                    float(box.get("w", 0)),
+                    float(box.get("h", 0)),
+                )
+            except (TypeError, ValueError):
+                continue
+            elements_layout.append(
+                {
+                    "asset_id": asset_id,
+                    "box": box_norm,
+                    "opacity": float(el.get("opacity", 1) or 1),
+                }
+            )
+
     if use_layers:
         layout = {
             "layout_id": layout_id,
+            "layout_kind": "master",
             "kv_asset_id": kv_asset_id,
+            "guide_ratio": guide_ratio or None,
             "font_family": font_family,
             "text_color": text_color,
             "text_align": text_align,
+            "image_box": image_box_payload,
             "text_layers": layers_payload,
+            "elements": elements_layout,
         }
     else:
         layout = {
             "layout_id": layout_id,
+            "layout_kind": "master",
             "kv_asset_id": kv_asset_id,
+            "guide_ratio": guide_ratio or None,
             "headline": headline,
             "subhead": subhead,
             "cta": cta,
@@ -671,6 +704,8 @@ async def preview_text_layout(
             "headline_box": headline_box,
             "subhead_box": subhead_box,
             "cta_box": cta_box,
+            "image_box": image_box_payload,
+            "elements": elements_layout,
         }
 
     proj_dir = Path(settings.data_dir) / "projects" / project_id
@@ -679,48 +714,76 @@ async def preview_text_layout(
     (layouts_dir / f"layout_{layout_id}.json").write_text(json.dumps(layout, indent=2), "utf-8")
 
     preview_ids: list[str] = []
+    ratio_layout_ids: dict[str, str] = {}
+    render_elements: list[dict] = []
+    if elements_layout:
+        for el in elements_layout:
+            asset_id = el.get("asset_id")
+            if not asset_id:
+                continue
+            asset = next(
+                (a for a in proj.assets if a.asset_id == asset_id and a.kind in ("element", "motif", "product")),
+                None,
+            )
+            if not asset:
+                continue
+            path = store.abs_asset_path(project_id, asset)
+            if not path.exists():
+                continue
+            try:
+                img = Image.open(path).convert("RGBA")
+            except Exception:
+                continue
+            render_elements.append(
+                {
+                    "image": img,
+                    "box": el.get("box"),
+                    "opacity": el.get("opacity", 1),
+                }
+            )
+
     for ratio in ("1:1", "4:5", "9:16"):
         size = settings.master_sizes.get(ratio)
         if not size:
             continue
-        render_elements: list[dict] = []
-        if elements_payload:
-            for el in elements_payload:
-                if not isinstance(el, dict):
-                    continue
-                asset_id = (el.get("asset_id") or "").strip()
-                if not asset_id:
-                    continue
-                asset = next(
-                    (a for a in proj.assets if a.asset_id == asset_id and a.kind in ("element", "motif", "product")),
-                    None,
-                )
-                if not asset:
-                    continue
-                path = store.abs_asset_path(project_id, asset)
-                if not path.exists():
-                    continue
-                try:
-                    img = Image.open(path).convert("RGBA")
-                except Exception:
-                    continue
-                box = el.get("box") if isinstance(el.get("box"), dict) else {}
-                try:
-                    box_norm = (
-                        float(box.get("x", 0)),
-                        float(box.get("y", 0)),
-                        float(box.get("w", 0)),
-                        float(box.get("h", 0)),
-                    )
-                except (TypeError, ValueError):
-                    continue
-                render_elements.append(
-                    {
-                        "image": img,
-                        "box": box_norm,
-                        "opacity": float(el.get("opacity", 1) or 1),
-                    }
-                )
+        ratio_layout_id = uuid.uuid4().hex[:12]
+        ratio_layout_ids[ratio] = ratio_layout_id
+        if use_layers:
+            ratio_layout = {
+                "layout_id": ratio_layout_id,
+                "layout_kind": "ratio",
+                "source_layout_id": layout_id,
+                "ratio": ratio,
+                "kv_asset_id": kv_asset_id,
+                "guide_ratio": ratio,
+                "font_family": font_family,
+                "text_color": text_color,
+                "text_align": text_align,
+                "image_box": image_box_payload,
+                "text_layers": layers_payload,
+                "elements": elements_layout,
+            }
+        else:
+            ratio_layout = {
+                "layout_id": ratio_layout_id,
+                "layout_kind": "ratio",
+                "source_layout_id": layout_id,
+                "ratio": ratio,
+                "kv_asset_id": kv_asset_id,
+                "guide_ratio": ratio,
+                "headline": headline,
+                "subhead": subhead,
+                "cta": cta,
+                "font_family": font_family,
+                "text_color": text_color,
+                "text_align": text_align,
+                "headline_box": headline_box,
+                "subhead_box": subhead_box,
+                "cta_box": cta_box,
+                "image_box": image_box_payload,
+                "elements": elements_layout,
+            }
+        (layouts_dir / f"layout_{ratio_layout_id}.json").write_text(json.dumps(ratio_layout, indent=2), "utf-8")
 
         if use_layers:
             rendered = render_text_layers(
@@ -752,6 +815,47 @@ async def preview_text_layout(
             )
         out_bytes = _pil_to_png_bytes(rendered.image)
         label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename
+        debug_render_layers: list[dict] | None = None
+        if use_layers:
+            debug_render_layers = []
+            for layer in layers_payload:
+                if not isinstance(layer, dict):
+                    continue
+                box = layer.get("box") if isinstance(layer.get("box"), dict) else {}
+                try:
+                    x = float(box.get("x", 0))
+                    y = float(box.get("y", 0))
+                    w = float(box.get("w", 0))
+                    h = float(box.get("h", 0))
+                except (TypeError, ValueError):
+                    continue
+                x1 = max(0, int(x * size[0]))
+                y1 = max(0, int(y * size[1]))
+                x2 = min(size[0], int((x + w) * size[0]))
+                y2 = min(size[1], int((y + h) * size[1]))
+                box_h = max(1, y2 - y1)
+                font_px = None
+                if layer.get("font_size_box_norm") is not None:
+                    try:
+                        font_px = float(layer.get("font_size_box_norm")) * box_h
+                    except (TypeError, ValueError):
+                        font_px = None
+                if font_px is None and layer.get("font_size_norm") is not None:
+                    try:
+                        font_px = float(layer.get("font_size_norm")) * size[0]
+                    except (TypeError, ValueError):
+                        font_px = None
+                debug_render_layers.append(
+                    {
+                        "text": layer.get("text"),
+                        "box_norm": {"x": x, "y": y, "w": w, "h": h},
+                        "box_px": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
+                        "font_px": font_px,
+                        "font_size_box_norm": layer.get("font_size_box_norm"),
+                        "font_size_norm": layer.get("font_size_norm"),
+                    }
+                )
+
         asset = store.add_asset(
             project_id=project_id,
             kind="text_preview",
@@ -761,6 +865,7 @@ async def preview_text_layout(
                 "ratio": ratio,
                 "kv_asset_id": kv_asset_id,
                 "layout_id": layout_id,
+                "ratio_layout_id": ratio_layout_ids.get(ratio),
                 "font_family": font_family,
                 "text_color": text_color,
                 "text_align": text_align,
@@ -768,6 +873,11 @@ async def preview_text_layout(
                 "headline": headline if not use_layers else None,
                 "subhead": subhead if not use_layers else None,
                 "cta": cta if not use_layers else None,
+                "debug_text_layers": layers_payload if use_layers else None,
+                "debug_render_layers": debug_render_layers,
+                "debug_elements": elements_layout or None,
+                "debug_image_box": image_box_payload,
+                "debug_guide_ratio": guide_ratio or None,
             },
             subdir="text_previews",
         )
@@ -787,7 +897,7 @@ async def preview_text_layout(
                 "image_box": image_box_payload,
                 "elements": len(elements_payload),
             },
-            "outputs": {"preview_asset_ids": preview_ids},
+            "outputs": {"preview_asset_ids": preview_ids, "ratio_layout_ids": ratio_layout_ids},
         },
     )
 
