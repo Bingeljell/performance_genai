@@ -158,12 +158,19 @@
                       >
                         Insert set
                       </button>
-                      <form method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" onsubmit="return confirm('Delete this copy set?');">
-                        <input type="hidden" name="indices" value="{{ loop.index0 }}" />
-                        <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                        <button class="btn" type="submit">Delete</button>
-                      </form>
+                      <button
+                        class="btn"
+                        type="submit"
+                        form="copy-set-delete-{{ loop.index0 }}"
+                        onclick="return confirm('Delete this copy set?');"
+                      >
+                        Delete
+                      </button>
                     </div>
+                    <form id="copy-set-delete-{{ loop.index0 }}" method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" style="display:none;">
+                      <input type="hidden" name="indices" value="{{ loop.index0 }}" />
+                      <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                    </form>
                   </div>
                 {% endfor %}
               </div>
@@ -249,6 +256,6 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=16"></script>
+    <script src="/static/editor.js?v=17"></script>
   </body>
 </html>

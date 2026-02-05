@@ -93,3 +93,5 @@
 - **2026-02-04 > src/performance_genai/api/app.py > bulk_delete_assets/delete_headlines > allow asset-kind scoped bulk deletes and add headline deletion endpoint**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > pass asset_kind for preview bulk deletes**
 - **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > add collapsible headlines panel with clear/delete actions and pass asset_kind for KV bulk deletes**
+- **2026-02-04 > src/performance_genai/api/app.py > delete_copy_sets > add endpoint to delete individual or all copy sets**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add delete controls for copy sets and bump editor.js cache buster to v17**
