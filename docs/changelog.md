@@ -82,3 +82,5 @@
 - **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > accept image_box payload and pass through to preview renderers**
 - **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layout/render_text_layers > render base image via normalized image box when provided**
 - **2026-02-04 > src/performance_genai/assembly/render.py > _render_base_image > preserve KV aspect ratio when mapping guide-based image boxes across ratios**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add per-text font size controls and edit buttons (delete/duplicate/layer) with cache buster v14**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > apply styling to selected text, add per-text font sizing, delete/duplicate/layer controls, and arrow-key nudging**

@@ -92,13 +92,27 @@
           <input type="range" id="font-scale" min="0.6" max="1.6" step="0.05" value="1.0" />
           <div class="muted" id="font-scale-value" style="margin-top:4px;">1.00x</div>
 
+          <label>Font size (selected)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="range" id="font-size" min="10" max="200" step="1" value="48" style="flex:1;" />
+            <input type="number" id="font-size-number" min="8" max="240" step="1" value="48" style="width:80px;" />
+          </div>
+
           <label>Align</label>
           <select id="align-select">
             <option value="left">left</option>
             <option value="center">center</option>
           </select>
 
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <button class="btn" id="btn-delete-text" type="button">Delete selected</button>
+            <button class="btn" id="btn-duplicate-text" type="button">Duplicate</button>
+            <button class="btn" id="btn-bring-forward" type="button">Bring forward</button>
+            <button class="btn" id="btn-send-back" type="button">Send back</button>
+          </div>
+
           <div class="muted" style="margin-top:10px;">Drag and resize text boxes on the canvas. Use handles to scale.</div>
+          <div class="muted" style="margin-top:6px;">Arrow keys nudge selected text (Shift = 10px).</div>
           <button class="btn" id="btn-preview" type="button" style="margin-top:10px;">Generate previews (1:1, 4:5, 9:16)</button>
 
           <div style="margin-top:16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.10);">
@@ -176,24 +190,45 @@
 
             {% if text_previews %}
               <div style="margin-top:14px;">
-                <div class="muted">Recent text previews</div>
-                <div class="grid">
-                  {% for a in text_previews[:9] %}
-                    <div class="item">
-                      <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
-                      <div class="k">
-                        <small class="muted">{{ a.metadata.ratio }}</small>
-                        <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                      </div>
-                      <div class="k">
-                        <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this preview?');">
-                          <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                          <button class="btn" type="submit">Delete</button>
-                        </form>
-                      </div>
-                    </div>
-                  {% endfor %}
+                <div class="k" style="margin-bottom:8px;">
+                  <div class="muted">Recent text previews</div>
+                  <label class="muted" style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" id="preview-select-all" />
+                    Select all
+                  </label>
                 </div>
+                <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete" onsubmit="return confirm('Delete selected previews?');">
+                  <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                  <div class="grid">
+                    {% for a in text_previews[:9] %}
+                      <div class="item">
+                        <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
+                        <div class="k">
+                          <small class="muted">{{ a.metadata.ratio }}</small>
+                          <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                        </div>
+                        <div class="k">
+                          <label class="muted" style="display:flex; align-items:center; gap:6px;">
+                            <input type="checkbox" class="preview-select" name="asset_ids" value="{{ a.asset_id }}" />
+                            select
+                          </label>
+                          <button
+                            class="btn"
+                            type="submit"
+                            formaction="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete"
+                            formmethod="post"
+                            onclick="return confirm('Delete this preview?');"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <div class="k" style="margin-top:10px;">
+                    <button class="btn" type="submit">Delete selected</button>
+                  </div>
+                </form>
               </div>
             {% endif %}
           </div>
@@ -201,6 +236,6 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=13"></script>
+    <script src="/static/editor.js?v=14"></script>
   </body>
 </html>

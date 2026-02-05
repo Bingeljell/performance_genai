@@ -52,10 +52,16 @@
   var colorInput = document.getElementById("color-input");
   var fontScaleInput = document.getElementById("font-scale");
   var fontScaleValue = document.getElementById("font-scale-value");
+  var fontSizeRange = document.getElementById("font-size");
+  var fontSizeInput = document.getElementById("font-size-number");
   var alignSelect = document.getElementById("align-select");
   var guideSelect = document.getElementById("guide-select");
   var btnPreview = document.getElementById("btn-preview");
   var btnInsertText = document.getElementById("btn-insert-text");
+  var btnDeleteText = document.getElementById("btn-delete-text");
+  var btnDuplicateText = document.getElementById("btn-duplicate-text");
+  var btnBringForward = document.getElementById("btn-bring-forward");
+  var btnSendBack = document.getElementById("btn-send-back");
   var copyButtons = document.querySelectorAll(".use-copy-set");
 
   if (!select || !document.getElementById("editor-canvas")) return;
@@ -105,6 +111,12 @@
     });
   }
 
+  function getActiveText() {
+    var obj = canvas.getActiveObject();
+    if (obj && obj.type === "textbox") return obj;
+    return null;
+  }
+
   function parseRatio(value) {
     var parts = (value || "").split(":");
     if (parts.length !== 2) return null;
@@ -140,6 +152,28 @@
       fill: colorInput.value,
       textAlign: alignSelect.value,
     });
+  }
+
+  function syncFontSizeControls(px) {
+    if (!px) return;
+    if (fontSizeRange) fontSizeRange.value = String(px);
+    if (fontSizeInput) fontSizeInput.value = String(px);
+  }
+
+  function syncControlsFromSelection(obj) {
+    if (!obj) return;
+    if (fontSelect && obj.fontFamily) fontSelect.value = obj.fontFamily;
+    if (colorInput && obj.fill) colorInput.value = obj.fill;
+    if (alignSelect && obj.textAlign) alignSelect.value = obj.textAlign;
+    syncFontSizeControls(Math.round(obj.fontSize || 12));
+  }
+
+  function applyStyleToSelection() {
+    var obj = getActiveText();
+    if (!obj) return;
+    applyTextStyles(obj);
+    canvas.renderAll();
+    saveState();
   }
 
   function createText(text, box, opts) {
@@ -195,6 +229,7 @@
     var obj = createText(text || "", useBox, opts);
     obj.set({ left: obj.left + offset, top: obj.top + offset });
     canvas.setActiveObject(obj);
+    syncControlsFromSelection(obj);
     canvas.renderAll();
     saveState();
     return obj;
@@ -332,10 +367,7 @@
   }
 
   function updateAllStyles() {
-    getTextObjects().forEach(function (obj) {
-      applyTextStyles(obj);
-    });
-    canvas.renderAll();
+    applyStyleToSelection();
   }
 
   function clamp01(v) {
@@ -442,13 +474,34 @@
     }
   }
 
+  function isEditableTarget(target) {
+    if (!target) return false;
+    var tag = (target.tagName || "").toLowerCase();
+    return tag === "input" || tag === "textarea" || target.isContentEditable;
+  }
+
   canvas.on("object:modified", function (e) {
     normalizeObjectScale(e.target);
+    if (e.target && e.target.type === "textbox") {
+      syncControlsFromSelection(e.target);
+    }
     canvas.renderAll();
     saveState();
   });
   canvas.on("text:changed", function (e) {
     saveState();
+  });
+  canvas.on("selection:created", function (e) {
+    var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
+    if (obj && obj.type === "textbox") {
+      syncControlsFromSelection(obj);
+    }
+  });
+  canvas.on("selection:updated", function (e) {
+    var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
+    if (obj && obj.type === "textbox") {
+      syncControlsFromSelection(obj);
+    }
   });
 
   select.addEventListener("change", function () {
@@ -459,6 +512,28 @@
   fontSelect.addEventListener("change", updateAllStyles);
   colorInput.addEventListener("input", updateAllStyles);
   alignSelect.addEventListener("change", updateAllStyles);
+  if (fontSizeRange) {
+    fontSizeRange.addEventListener("input", function () {
+      var obj = getActiveText();
+      var next = parseInt(fontSizeRange.value || "12", 10) || 12;
+      if (fontSizeInput) fontSizeInput.value = String(next);
+      if (!obj) return;
+      obj.set({ fontSize: next });
+      canvas.renderAll();
+      saveState();
+    });
+  }
+  if (fontSizeInput) {
+    fontSizeInput.addEventListener("change", function () {
+      var obj = getActiveText();
+      var next = parseInt(fontSizeInput.value || "12", 10) || 12;
+      if (fontSizeRange) fontSizeRange.value = String(next);
+      if (!obj) return;
+      obj.set({ fontSize: next });
+      canvas.renderAll();
+      saveState();
+    });
+  }
   if (guideSelect) {
     guideSelect.addEventListener("change", function () {
       guideRatio = guideSelect.value || "1:1";
@@ -466,6 +541,38 @@
       saveState();
     });
   }
+
+  document.addEventListener("keydown", function (e) {
+    if (isEditableTarget(e.target)) return;
+    var obj = getActiveText();
+    if (!obj) return;
+    if (obj.isEditing) return;
+    var step = e.shiftKey ? 10 : 1;
+    var handled = false;
+    if (e.key === "ArrowLeft") {
+      obj.set({ left: obj.left - step });
+      handled = true;
+    } else if (e.key === "ArrowRight") {
+      obj.set({ left: obj.left + step });
+      handled = true;
+    } else if (e.key === "ArrowUp") {
+      obj.set({ top: obj.top - step });
+      handled = true;
+    } else if (e.key === "ArrowDown") {
+      obj.set({ top: obj.top + step });
+      handled = true;
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      canvas.remove(obj);
+      canvas.discardActiveObject();
+      handled = true;
+    }
+    if (handled) {
+      obj.setCoords();
+      canvas.renderAll();
+      saveState();
+      e.preventDefault();
+    }
+  });
   if (fontScaleInput) {
     fontScaleInput.addEventListener("input", function () {
       var next = parseFloat(fontScaleInput.value || "1") || 1;
@@ -484,6 +591,49 @@
   if (btnInsertText) {
     btnInsertText.addEventListener("click", function () {
       addTextBox("", defaultTextBox);
+    });
+  }
+  if (btnDeleteText) {
+    btnDeleteText.addEventListener("click", function () {
+      var obj = getActiveText();
+      if (!obj) return;
+      canvas.remove(obj);
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      saveState();
+    });
+  }
+  if (btnDuplicateText) {
+    btnDuplicateText.addEventListener("click", function () {
+      var obj = getActiveText();
+      if (!obj) return;
+      obj.clone(function (cloned) {
+        cloned.set({ left: obj.left + 12, top: obj.top + 12 });
+        canvas.add(cloned);
+        canvas.setActiveObject(cloned);
+        canvas.renderAll();
+        saveState();
+      });
+    });
+  }
+  if (btnBringForward) {
+    btnBringForward.addEventListener("click", function () {
+      var obj = getActiveText();
+      if (!obj) return;
+      canvas.bringForward(obj);
+      if (guideRect) canvas.sendToBack(guideRect);
+      canvas.renderAll();
+      saveState();
+    });
+  }
+  if (btnSendBack) {
+    btnSendBack.addEventListener("click", function () {
+      var obj = getActiveText();
+      if (!obj) return;
+      canvas.sendBackwards(obj);
+      if (guideRect) canvas.sendToBack(guideRect);
+      canvas.renderAll();
+      saveState();
     });
   }
 
