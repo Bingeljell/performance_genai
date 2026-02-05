@@ -265,7 +265,7 @@
         fontFamily: layer.font_family || fontSelect.value,
         fill: layer.color || colorInput.value,
         align: layer.align || alignSelect.value,
-        fontSizePx: layer.font_size_norm ? layer.font_size_norm * base.height : null,
+        fontSizePx: layer.font_size_norm ? layer.font_size_norm * base.width : null,
       };
       createText(layer.text || "", box, opts);
     });
@@ -571,7 +571,7 @@
           w: clamp01(rect.width / base.width),
           h: clamp01(rect.height / base.height),
         },
-        font_size_norm: (obj.fontSize || 12) / base.height,
+        font_size_norm: (obj.fontSize || 12) / base.width,
         font_family: obj.fontFamily || fontSelect.value,
         color: obj.fill || colorInput.value,
         align: obj.textAlign || alignSelect.value,

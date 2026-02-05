@@ -217,7 +217,7 @@ def render_text_layers(
             font_px = max(12, int((y2 - y1) * 0.5))
         else:
             try:
-                font_px = max(10, int(float(font_size_norm) * size[1]))
+                font_px = max(10, int(float(font_size_norm) * size[0]))
             except (TypeError, ValueError):
                 font_px = max(12, int((y2 - y1) * 0.5))
 
@@ -359,10 +359,15 @@ def _apply_elements(base: Image.Image, size: tuple[int, int], elements: list[dic
             continue
         if w <= 0 or h <= 0:
             continue
-        x1 = int(x * tw)
-        y1 = int(y * th)
+        cx = x + (w / 2)
+        cy = y + (h / 2)
         w_px = max(1, int(w * tw))
-        h_px = max(1, int(h * th))
+        img_w, img_h = img.size
+        if img_w <= 0 or img_h <= 0:
+            continue
+        h_px = max(1, int(w_px * (img_h / img_w)))
+        x1 = int((cx * tw) - (w_px / 2))
+        y1 = int((cy * th) - (h_px / 2))
         try:
             layer = img.resize((w_px, h_px), Image.Resampling.LANCZOS).convert("RGBA")
         except Exception:
