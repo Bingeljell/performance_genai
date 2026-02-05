@@ -74,6 +74,8 @@
   var copyButtons = document.querySelectorAll(".use-copy-set");
   var assetInsertButtons = document.querySelectorAll("[data-insert-asset]");
   var layerPanel = document.getElementById("layer-panel");
+  var ratioLabel = document.getElementById("ratio-label");
+  var loadingOverlay = document.getElementById("loading-overlay");
 
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
@@ -128,6 +130,17 @@
   var historyTimer = null;
   var lastSnapshot = "";
   var historyLimit = 3;
+
+  function showLoader() {
+    if (loadingOverlay) {
+      loadingOverlay.classList.add("active");
+    }
+  }
+
+  function updateRatioLabel() {
+    if (!ratioLabel) return;
+    ratioLabel.textContent = "ratio: " + guideRatio;
+  }
 
   function getTextObjects() {
     return canvas.getObjects().filter(function (obj) {
@@ -540,6 +553,7 @@
     updateGuideRect(nextGuide);
     currentOffset = nextOffset;
     canvas.renderAll();
+    updateRatioLabel();
   }
 
   function setBackground(kv, state) {
@@ -720,7 +734,10 @@
       setHidden("form-image-box", JSON.stringify(imageBox));
     }
     var form = document.getElementById("preview-form");
-    if (form) form.submit();
+    if (form) {
+      showLoader();
+      form.submit();
+    }
   }
 
   function saveState() {
@@ -1047,6 +1064,10 @@
       undo();
     });
   }
+
+  document.addEventListener("submit", function () {
+    showLoader();
+  });
   if (assetUploadBtn && assetUploadFile) {
     assetUploadBtn.addEventListener("click", function () {
       assetUploadFile.click();

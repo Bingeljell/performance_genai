@@ -199,6 +199,7 @@ class GeminiProvider:
         aspect_ratio: str,
         image_size: str = "2K",
         n: int = 1,
+        locked_canvas: Image.Image | None = None,
     ) -> list[GeneratedImage]:
         """
         Generate a text-free "master visual" variant by asking the image model to:
@@ -228,10 +229,10 @@ class GeminiProvider:
         for _ in range(max(1, n)):
             contents: list[Any] = [enriched]
 
-            # Provide a "locked canvas" input (base image centered on a larger canvas)
+            # Provide a "locked canvas" input (base image centered or positioned on a larger canvas)
             # so the model is biased toward only filling the empty margins.
             base_img = Image.open(kv_image).convert("RGB")
-            locked = _make_outpaint_canvas(base_img, aspect_ratio=aspect_ratio)
+            locked = locked_canvas or _make_outpaint_canvas(base_img, aspect_ratio=aspect_ratio)
             contents.append(locked)
             if motif_image is not None:
                 contents.append(Image.open(motif_image))

@@ -146,3 +146,11 @@
 - **2026-02-05 > src/performance_genai/api/static/editor.js > saveState/restoreHistory > persist background position via image_box and restore KV object on undo**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > remove static KV img tag and bump editor.js cache buster to v24**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add a subtle border around the canvas stage for clearer bounds**
+- **2026-02-05 > src/performance_genai/providers/gemini_provider.py > reframe_kv_with_motif > allow passing a locked canvas to control outpaint placement**
+- **2026-02-05 > src/performance_genai/api/app.py > outpaint_layout/_make_outpaint_canvas_with_box > add ratio outpaint endpoint using user image placement**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add per-preview Outpaint action**
+- **2026-02-05 > src/performance_genai/api/app.py > _parse_float > fix indentation/regression introduced during outpaint work**
+- **2026-02-05 > src/performance_genai/api/app.py > editor_page > include derived KVs so outpainted layouts can open in the editor**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add loader overlay, ratio label, and fix outpaint button submission; bump cache buster to v25**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > collectAndSubmit/applyGuide > show loader on submit and display active ratio label**
+- **2026-02-05 > src/performance_genai/api/app.py > delete_asset/bulk_delete_assets/outpaint_layout > cascade-delete outpainted KV assets when removing previews**

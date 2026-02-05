@@ -62,6 +62,11 @@
       .color-summary { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
       .color-summary:hover { background: rgba(255,255,255,0.12); }
       .color-swatch { width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; background: #ffffff; }
+      .loading-overlay { position: fixed; inset: 0; background: rgba(8, 10, 14, 0.72); display: none; align-items: center; justify-content: center; z-index: 999; }
+      .loading-overlay.active { display: flex; }
+      .loading-card { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 14px; border: 1px solid var(--stroke); background: var(--panel2); box-shadow: 0 16px 32px var(--shadow); font-size: 14px; }
+      .spinner { width: 18px; height: 18px; border-radius: 999px; border: 2px solid rgba(255,255,255,0.25); border-top-color: rgba(255,255,255,0.85); animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
       .layer-list { display:flex; flex-direction: column; gap: 6px; margin-top: 10px; }
       .layer-row { display:flex; align-items:center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: rgba(0,0,0,0.18); cursor: pointer; }
       .layer-row:hover { background: rgba(255,255,255,0.06); }
@@ -314,6 +319,7 @@
             <div class="canvas-wrap">
               <div class="canvas-toolbar">
                 <span class="muted" id="kv-label">No visual selected</span>
+                <span class="muted" id="ratio-label"></span>
               </div>
               <div id="canvas-stage" style="position: relative; display: inline-block;">
                 <canvas id="editor-canvas" width="900" height="900"></canvas>
@@ -336,6 +342,7 @@
                 <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete">
                   <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
                   <input type="hidden" name="asset_kind" value="text_preview" />
+                  <input type="hidden" name="image_size" value="2K" />
                   <div class="grid">
                     {% for a in text_previews[:9] %}
                       <div class="item">
@@ -346,6 +353,16 @@
                           <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
                           {% if a.metadata.ratio_layout_id %}
                             <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">open in editor</a>
+                            <button
+                              class="btn"
+                              type="submit"
+                              formmethod="post"
+                              formaction="/projects/{{ project.project_id }}/layouts/{{ a.metadata.ratio_layout_id }}/outpaint"
+                              name="image_size"
+                              value="2K"
+                            >
+                              Outpaint
+                            </button>
                           {% endif %}
                         </div>
                       </div>
@@ -387,6 +404,12 @@
     {% if editor_layout %}
       <script id="layout-data" type="application/json">{{ editor_layout | tojson }}</script>
     {% endif %}
-    <script src="/static/editor.js?v=24"></script>
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <div>Working…</div>
+      </div>
+    </div>
+    <script src="/static/editor.js?v=25"></script>
   </body>
 </html>

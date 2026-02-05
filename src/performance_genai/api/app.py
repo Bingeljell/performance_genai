@@ -60,6 +60,71 @@ def _parse_float(value: str | None, default: float) -> float:
         return default
 
 
+def _make_outpaint_canvas_with_box(
+    base: Image.Image,
+    size: tuple[int, int],
+    image_box: dict[str, Any] | None,
+) -> Image.Image:
+    tw, th = size
+    canvas = Image.new("RGB", (tw, th), (128, 128, 128))
+    try:
+        import random
+
+        px = canvas.load()
+        for _ in range(int(tw * th * 0.002)):
+            x = random.randint(0, tw - 1)
+            y = random.randint(0, th - 1)
+            v = 120 + random.randint(0, 20)
+            px[x, y] = (v, v, v)
+    except Exception:
+        pass
+
+    if not image_box:
+        iw, ih = base.size
+        if iw > 0 and ih > 0:
+            scale = min(tw / iw, th / ih)
+            nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+            resized = base.convert("RGB").resize((nw, nh), Image.Resampling.LANCZOS)
+            left = max(0, (tw - nw) // 2)
+            top = max(0, (th - nh) // 2)
+            canvas.paste(resized, (left, top))
+        return canvas
+
+    try:
+        x = float(image_box.get("x", 0))
+        y = float(image_box.get("y", 0))
+        w = float(image_box.get("w", 1))
+    except (TypeError, ValueError):
+        return canvas
+
+    if w <= 0:
+        iw, ih = base.size
+        if iw > 0 and ih > 0:
+            scale = min(tw / iw, th / ih)
+            nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+            resized = base.convert("RGB").resize((nw, nh), Image.Resampling.LANCZOS)
+            left = max(0, (tw - nw) // 2)
+            top = max(0, (th - nh) // 2)
+            canvas.paste(resized, (left, top))
+        return canvas
+
+    img_w, img_h = base.size
+    if img_w <= 0 or img_h <= 0:
+        return canvas
+
+    target_w = max(1, int(round(w * tw)))
+    target_h = max(1, int(round(target_w * (img_h / img_w))))
+    resized = base.convert("RGB").resize((target_w, target_h), Image.Resampling.LANCZOS)
+    px = int(round(x * tw))
+    py = int(round(y * th))
+    canvas.paste(resized, (px, py))
+    return canvas
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
 def _parse_box_from_form(
     x: str | None,
     y: str | None,
@@ -186,14 +251,13 @@ def editor_page(request: Request, project_id: str, layout_id: str = ""):
     proj = store.read_project(project_id)
     assets = list(reversed(proj.assets))
     kvs = [a for a in assets if a.kind == "kv"]
-    base_kvs = [a for a in kvs if not (a.metadata or {}).get("source_kv_asset_id")]
     kv_choices = [
         {
             "id": a.asset_id,
             "label": (a.metadata or {}).get("display_name") or a.filename,
             "url": f"/projects/{project_id}/assets/{a.asset_id}",
         }
-        for a in base_kvs
+        for a in kvs
     ]
     selected_kv = request.query_params.get("kv") or ""
     editor_layout: dict | None = None
@@ -255,6 +319,180 @@ async def upload_asset(
     redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
     return RedirectResponse(url=redirect_path, status_code=303)
 
+
+@app.post("/projects/{project_id}/layouts/{layout_id}/outpaint")
+async def outpaint_layout(
+    project_id: str,
+    layout_id: str,
+    image_size: str = Form("2K"),
+    prompt: str = Form(
+        "Return the SAME image, only outpaint missing areas to fill the target ratio. "
+        "Do not change or edit existing content."
+    ),
+):
+    proj = store.read_project(project_id)
+    layouts_dir = Path(settings.data_dir) / "projects" / project_id / "layouts"
+    layout_path = layouts_dir / f"layout_{layout_id}.json"
+    if not layout_path.exists():
+        raise HTTPException(status_code=404, detail="layout not found")
+
+    layout = json.loads(layout_path.read_text("utf-8"))
+    ratio = layout.get("ratio") or layout.get("guide_ratio") or "1:1"
+    size = settings.master_sizes.get(ratio)
+    if not size:
+        raise HTTPException(status_code=400, detail="ratio not supported for outpaint")
+
+    kv_asset_id = layout.get("kv_asset_id") or ""
+    kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
+    if not kv_asset:
+        raise HTTPException(status_code=400, detail="kv_asset_id must be an existing KV asset")
+
+    kv_path = store.abs_asset_path(project_id, kv_asset)
+    base_img = Image.open(kv_path).convert("RGB")
+    locked_canvas = _make_outpaint_canvas_with_box(base_img, size, layout.get("image_box"))
+
+    gemini = _get_gemini()
+    sys_constraints = _build_reframe_constraints(False)
+    images = await gemini.reframe_kv_with_motif(
+        kv_image=kv_path,
+        motif_image=None,
+        prompt=f"{prompt}\n\n{sys_constraints}",
+        aspect_ratio=ratio,
+        image_size=image_size,
+        n=1,
+        locked_canvas=locked_canvas,
+    )
+    if not images:
+        raise HTTPException(status_code=500, detail="outpaint failed")
+
+    source_label = (kv_asset.metadata or {}).get("display_name") or kv_asset.filename
+    display_label = f"{source_label}_outpaint_{ratio}"
+    buf = _pil_to_png_bytes(images[0].image)
+    out_asset = store.add_asset(
+        project_id=project_id,
+        kind="kv",
+        filename="kv_outpaint.png",
+        content=buf,
+        metadata={
+            "provider": images[0].provider,
+            "model": images[0].model,
+            "prompt": images[0].prompt_used,
+            "source_kv_asset_id": kv_asset_id,
+            "aspect_ratio": ratio,
+            "image_size": image_size,
+            "display_name": display_label,
+            "source_layout_id": layout_id,
+            "image_box": layout.get("image_box"),
+        },
+        subdir="kvs",
+    )
+
+    new_layout_id = uuid.uuid4().hex[:12]
+    new_layout = dict(layout)
+    new_layout.update(
+        {
+            "layout_id": new_layout_id,
+            "layout_kind": "ratio_outpaint",
+            "source_layout_id": layout_id,
+            "ratio": ratio,
+            "kv_asset_id": out_asset.asset_id,
+            "guide_ratio": ratio,
+            "image_box": None,
+        }
+    )
+    (layouts_dir / f"layout_{new_layout_id}.json").write_text(json.dumps(new_layout, indent=2), "utf-8")
+
+    elements_layout = new_layout.get("elements") if isinstance(new_layout.get("elements"), list) else []
+    render_elements: list[dict] = []
+    if elements_layout:
+        for el in elements_layout:
+            if not isinstance(el, dict):
+                continue
+            asset_id = (el.get("asset_id") or "").strip()
+            if not asset_id:
+                continue
+            asset = next(
+                (a for a in proj.assets if a.asset_id == asset_id and a.kind in ("element", "motif", "product")),
+                None,
+            )
+            if not asset:
+                continue
+            path = store.abs_asset_path(project_id, asset)
+            if not path.exists():
+                continue
+            try:
+                img = Image.open(path).convert("RGBA")
+            except Exception:
+                continue
+            render_elements.append(
+                {
+                    "image": img,
+                    "box": el.get("box"),
+                    "opacity": el.get("opacity", 1),
+                }
+            )
+
+    kv_img = Image.open(store.abs_asset_path(project_id, out_asset)).convert("RGB")
+    if new_layout.get("text_layers"):
+        rendered = render_text_layers(
+            kv=kv_img,
+            size=size,
+            text_layers=new_layout.get("text_layers") or [],
+            font_family=new_layout.get("font_family") or "dejavu",
+            text_color_hex=new_layout.get("text_color") or "#ffffff",
+            text_align=new_layout.get("text_align") or "left",
+            image_box=None,
+            elements=render_elements,
+        )
+    else:
+        rendered = render_text_layout(
+            kv=kv_img,
+            size=size,
+            headline=new_layout.get("headline") or "",
+            subhead=new_layout.get("subhead") or "",
+            cta=new_layout.get("cta") or "",
+            font_family=new_layout.get("font_family") or "dejavu",
+            text_color_hex=new_layout.get("text_color") or "#ffffff",
+            text_align=new_layout.get("text_align") or "left",
+            headline_box=new_layout.get("headline_box"),
+            subhead_box=new_layout.get("subhead_box"),
+            cta_box=new_layout.get("cta_box"),
+            image_box=None,
+            elements=render_elements,
+        )
+
+    preview_asset = store.add_asset(
+        project_id=project_id,
+        kind="text_preview",
+        filename="layout_outpaint_preview.png",
+        content=_pil_to_png_bytes(rendered.image),
+        metadata={
+            "ratio": ratio,
+            "ratio_layout_id": new_layout_id,
+            "source_layout_id": layout_id,
+            "outpaint_kv_asset_id": out_asset.asset_id,
+        },
+        subdir="text_previews",
+    )
+
+    store.write_run_manifest(
+        project_id,
+        {
+            "type": "layout_outpaint",
+            "provider": gemini.name,
+            "model": settings.gemini_image_model,
+            "inputs": {
+                "layout_id": layout_id,
+                "ratio": ratio,
+                "kv_asset_id": kv_asset_id,
+                "image_size": image_size,
+            },
+            "outputs": {"kv_asset_id": out_asset.asset_id, "preview_asset_id": preview_asset.asset_id},
+        },
+    )
+
+    return RedirectResponse(url=f"/projects/{project_id}/editor", status_code=303)
+
 @app.post("/projects/{project_id}/delete")
 def delete_project(project_id: str):
     store.delete_project(project_id)
@@ -263,6 +501,15 @@ def delete_project(project_id: str):
 
 @app.post("/projects/{project_id}/assets/{asset_id}/delete")
 def delete_asset(project_id: str, asset_id: str, return_to: str = Form("")):
+    proj = store.read_project(project_id)
+    asset = next((a for a in proj.assets if a.asset_id == asset_id), None)
+    if asset and asset.kind == "text_preview":
+        linked = (asset.metadata or {}).get("outpaint_kv_asset_id")
+        if linked:
+            try:
+                store.delete_asset(project_id, linked)
+            except Exception:
+                pass
     store.delete_asset(project_id, asset_id)
     redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
     return RedirectResponse(url=redirect_path, status_code=303)
@@ -292,6 +539,11 @@ def bulk_delete_assets(
         if asset_id not in allowed:
             continue
         try:
+            asset = next((a for a in proj.assets if a.asset_id == asset_id), None)
+            if asset and asset.kind == "text_preview":
+                linked = (asset.metadata or {}).get("outpaint_kv_asset_id")
+                if linked:
+                    store.delete_asset(project_id, linked)
             store.delete_asset(project_id, asset_id)
         except Exception:
             continue
