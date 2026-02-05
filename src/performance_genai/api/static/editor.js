@@ -206,6 +206,14 @@
     return { color: color, opacity: opacity, radius: radius };
   }
 
+  function getTextBgPadding(obj) {
+    var base = getGuideBounds();
+    var baseW = base.width || 1;
+    var fontPx = (obj && obj.fontSize) ? obj.fontSize : 12;
+    var pad = Math.max(4, Math.min(24, fontPx * 0.22));
+    return { pad: pad, baseWidth: baseW };
+  }
+
   function syncTextBgControls(obj) {
     if (!obj) return;
     var color = obj.pg_bg_color || ((textBgHex && textBgHex.value) || "#000000");
@@ -240,13 +248,21 @@
       return;
     }
     var box = obj.getBoundingRect(true);
-    var rx = radius >= 999 ? Math.min(box.width, box.height) / 2 : radius;
+    var padInfo = getTextBgPadding(obj);
+    obj.pg_bg_pad = padInfo.pad;
+    obj.pg_bg_pad_base_width = padInfo.baseWidth;
+    var pad = padInfo.pad;
+    var left = box.left - pad;
+    var top = box.top - pad;
+    var width = box.width + pad * 2;
+    var height = box.height + pad * 2;
+    var rx = radius >= 999 ? Math.min(width, height) / 2 : radius;
     if (!rect) {
       rect = new fabric.Rect({
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        height: box.height,
+        left: left,
+        top: top,
+        width: width,
+        height: height,
         fill: rgbaFromHex(color, opacity),
         rx: rx,
         ry: rx,
@@ -260,10 +276,10 @@
       canvas.add(rect);
     } else {
       rect.set({
-        left: box.left,
-        top: box.top,
-        width: box.width,
-        height: box.height,
+        left: left,
+        top: top,
+        width: width,
+        height: height,
         fill: rgbaFromHex(color, opacity),
         rx: rx,
         ry: rx,
@@ -459,6 +475,8 @@
         obj.pg_bg_opacity = layer.bg_opacity == null ? 0 : layer.bg_opacity;
         obj.pg_bg_radius = layer.bg_radius_px == null ? 0 : layer.bg_radius_px;
         obj.pg_bg_radius_base_width = layer.bg_radius_base_width || base.width;
+        obj.pg_bg_pad = layer.bg_padding_px == null ? null : layer.bg_padding_px;
+        obj.pg_bg_pad_base_width = layer.bg_padding_base_width || base.width;
         updateTextBackground(obj);
       }
     });
@@ -911,6 +929,8 @@
         bg_opacity: obj.pg_bg_opacity == null ? null : obj.pg_bg_opacity,
         bg_radius_px: obj.pg_bg_radius == null ? null : obj.pg_bg_radius,
         bg_radius_base_width: obj.pg_bg_radius_base_width || base.width,
+        bg_padding_px: obj.pg_bg_pad == null ? null : obj.pg_bg_pad,
+        bg_padding_base_width: obj.pg_bg_pad_base_width || base.width,
       });
     }
     return layers;

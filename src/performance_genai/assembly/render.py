@@ -278,11 +278,23 @@ def render_text_layers(
                         radius_px = float(layer.get("bg_radius_px")) * (size[0] / float(layer.get("bg_radius_base_width")))
                     except (TypeError, ValueError, ZeroDivisionError):
                         radius_px = 0
-                radius_px = max(0, min(radius_px, min(max_w, y2 - y1) / 2))
+                pad_px = 0
+                if layer.get("bg_padding_px") is not None and layer.get("bg_padding_base_width"):
+                    try:
+                        pad_px = float(layer.get("bg_padding_px")) * (size[0] / float(layer.get("bg_padding_base_width")))
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        pad_px = 0
+                if pad_px <= 0:
+                    pad_px = max(4, min(24, font_px * 0.22))
+                x1p = max(0, int(x1 - pad_px))
+                y1p = max(0, int(y1 - pad_px))
+                x2p = min(size[0], int(x2 + pad_px))
+                y2p = min(size[1], int(y2 + pad_px))
+                radius_px = max(0, min(radius_px, min(x2p - x1p, y2p - y1p) / 2))
                 try:
-                    draw.rounded_rectangle((x1, y1, x2, y2), radius=radius_px, fill=bg_fill)
+                    draw.rounded_rectangle((x1p, y1p, x2p, y2p), radius=radius_px, fill=bg_fill)
                 except Exception:
-                    draw.rectangle((x1, y1, x2, y2), fill=bg_fill)
+                    draw.rectangle((x1p, y1p, x2p, y2p), fill=bg_fill)
 
         tx = x1
         if align in ("center", "right"):

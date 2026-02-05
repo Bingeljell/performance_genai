@@ -159,4 +159,6 @@
 - **2026-02-05 > src/performance_genai/api/static/editor.js > text background/shape controls > add text background styling, shape insertion, and preview payload support**
 - **2026-02-05 > src/performance_genai/api/app.py > preview_text_layout/outpaint_layout > persist shapes and pass them into preview/outpaint rendering**
 - **2026-02-05 > src/performance_genai/assembly/render.py > render_text_layers/render_text_layout > draw shapes and text background boxes during preview rendering**
+- **2026-02-05 > src/performance_genai/api/static/editor.js > updateTextBackground/collectTextLayers > add padding around text backgrounds and persist padding for previews**
+- **2026-02-05 > src/performance_genai/assembly/render.py > render_text_layers > expand text background by padding to avoid clipped rounded corners**
 - **2026-02-05 > src/performance_genai/api/app.py > delete_asset/bulk_delete_assets/outpaint_layout > cascade-delete outpainted KV assets when removing previews**
