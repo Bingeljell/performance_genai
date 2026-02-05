@@ -49,20 +49,28 @@
   var label = document.getElementById("kv-label");
   var bgImg = document.getElementById("kv-bg");
   var fontSelect = document.getElementById("font-select");
-  var colorInput = document.getElementById("color-input");
   var fontScaleInput = document.getElementById("font-scale");
   var fontScaleValue = document.getElementById("font-scale-value");
-  var fontSizeRange = document.getElementById("font-size");
-  var fontSizeInput = document.getElementById("font-size-number");
+  var fontSizeSelect = document.getElementById("font-size-select");
+  var fontSizeCustom = document.getElementById("font-size-custom");
   var alignSelect = document.getElementById("align-select");
   var guideSelect = document.getElementById("guide-select");
   var btnPreview = document.getElementById("btn-preview");
   var btnInsertText = document.getElementById("btn-insert-text");
+  var btnUndo = document.getElementById("btn-undo");
   var btnDeleteText = document.getElementById("btn-delete-text");
   var btnDuplicateText = document.getElementById("btn-duplicate-text");
   var btnBringForward = document.getElementById("btn-bring-forward");
   var btnSendBack = document.getElementById("btn-send-back");
   var copyButtons = document.querySelectorAll(".use-copy-set");
+  var assetInsertButtons = document.querySelectorAll("[data-insert-asset]");
+
+  var colorPicker = document.getElementById("color-picker");
+  var colorInput = document.getElementById("color-input");
+  var colorSwatch = document.getElementById("color-swatch");
+  var assetUploadBtn = document.getElementById("btn-upload-asset");
+  var assetUploadFile = document.getElementById("asset-upload-file");
+  var assetUploadName = document.getElementById("asset-upload-name");
 
   if (!select || !document.getElementById("editor-canvas")) return;
 
@@ -91,6 +99,10 @@
       fabric.Text.prototype.textBaseline = "alphabetic";
     }
 
+  if (colorSwatch && colorInput) {
+    colorSwatch.style.background = colorInput.value || "#ffffff";
+  }
+
   var canvasSize = { w: canvas.getWidth(), h: canvas.getHeight() };
   var imageSize = { w: canvasSize.w, h: canvasSize.h };
   var currentOffset = { x: 0, y: 0 };
@@ -105,9 +117,22 @@
     { x: 0.08, y: 0.90, w: 0.44, h: 0.07 },
   ];
 
+  var history = [];
+  var historyIndex = -1;
+  var historyLock = false;
+  var historyTimer = null;
+  var lastSnapshot = "";
+  var historyLimit = 3;
+
   function getTextObjects() {
     return canvas.getObjects().filter(function (obj) {
       return obj && obj.type === "textbox";
+    });
+  }
+
+  function getElementObjects() {
+    return canvas.getObjects().filter(function (obj) {
+      return obj && obj.type === "image" && obj.pg_asset_id;
     });
   }
 
@@ -115,6 +140,10 @@
     var obj = canvas.getActiveObject();
     if (obj && obj.type === "textbox") return obj;
     return null;
+  }
+
+  function getActiveObject() {
+    return canvas.getActiveObject();
   }
 
   function parseRatio(value) {
@@ -147,23 +176,36 @@
 
   function applyTextStyles(obj) {
     if (!obj) return;
+    var colorValue = (colorInput && colorInput.value) ? colorInput.value : "#ffffff";
     obj.set({
       fontFamily: fontSelect.value,
-      fill: colorInput.value,
+      fill: colorValue,
       textAlign: alignSelect.value,
     });
   }
 
   function syncFontSizeControls(px) {
     if (!px) return;
-    if (fontSizeRange) fontSizeRange.value = String(px);
-    if (fontSizeInput) fontSizeInput.value = String(px);
+    if (fontSizeSelect) {
+      var val = String(px);
+      var found = false;
+      for (var i = 0; i < fontSizeSelect.options.length; i++) {
+        if (fontSizeSelect.options[i].value === val) {
+          found = true;
+          break;
+        }
+      }
+      fontSizeSelect.value = found ? val : "";
+    }
+    if (fontSizeCustom) fontSizeCustom.value = String(px);
   }
 
   function syncControlsFromSelection(obj) {
     if (!obj) return;
     if (fontSelect && obj.fontFamily) fontSelect.value = obj.fontFamily;
     if (colorInput && obj.fill) colorInput.value = obj.fill;
+    if (colorPicker && obj.fill) colorPicker.value = obj.fill;
+    if (colorSwatch && obj.fill) colorSwatch.style.background = obj.fill;
     if (alignSelect && obj.textAlign) alignSelect.value = obj.textAlign;
     syncFontSizeControls(Math.round(obj.fontSize || 12));
   }
@@ -232,7 +274,64 @@
     syncControlsFromSelection(obj);
     canvas.renderAll();
     saveState();
+    snapshotNow();
     return obj;
+  }
+
+  function restoreElements(state) {
+    getElementObjects().forEach(function (obj) {
+      canvas.remove(obj);
+    });
+    if (!state || !state.elements || !state.elements.length) {
+      return;
+    }
+    state.elements.forEach(function (el) {
+      if (!el || !el.src) return;
+      fabric.Image.fromURL(el.src, function (img) {
+        img.set({
+          left: el.left || 0,
+          top: el.top || 0,
+          scaleX: el.scaleX || 1,
+          scaleY: el.scaleY || 1,
+          opacity: el.opacity == null ? 1 : el.opacity,
+          cornerColor: "#8fe4c7",
+          borderColor: "#8fe4c7",
+          transparentCorners: false,
+        });
+        img.pg_asset_id = el.asset_id || el.pg_asset_id || "";
+        img.pg_src = el.src;
+        canvas.add(img);
+        canvas.renderAll();
+      }, { crossOrigin: "anonymous" });
+    });
+  }
+
+  function insertAssetFromUrl(url, assetId) {
+    if (!url) return;
+    var base = getGuideBounds();
+    fabric.Image.fromURL(url, function (img) {
+      var maxW = base.width * 0.25;
+      var maxH = base.height * 0.25;
+      var scale = Math.min(1, maxW / img.width, maxH / img.height);
+      var left = base.left + base.width * 0.08;
+      var top = base.top + base.height * 0.08;
+      img.set({
+        left: left,
+        top: top,
+        scaleX: scale,
+        scaleY: scale,
+        cornerColor: "#8fe4c7",
+        borderColor: "#8fe4c7",
+        transparentCorners: false,
+      });
+      img.pg_asset_id = assetId || "";
+      img.pg_src = url;
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.renderAll();
+      saveState();
+      snapshotNow();
+    }, { crossOrigin: "anonymous" });
   }
 
   function updateGuideRect(bounds) {
@@ -262,6 +361,53 @@
       });
     }
     canvas.sendToBack(guideRect);
+  }
+
+  function snapshotNow() {
+    if (historyLock) return;
+    var json = canvas.toDatalessJSON(["pg_asset_id", "pg_src"]);
+    var serialized = "";
+    try {
+      serialized = JSON.stringify(json);
+    } catch (e) {
+      return;
+    }
+    if (serialized === lastSnapshot) return;
+    lastSnapshot = serialized;
+    if (historyIndex < history.length - 1) {
+      history = history.slice(0, historyIndex + 1);
+    }
+    history.push(json);
+    if (history.length > historyLimit) {
+      history.shift();
+    }
+    historyIndex = history.length - 1;
+  }
+
+  function queueSnapshot() {
+    if (historyLock) return;
+    if (historyTimer) window.clearTimeout(historyTimer);
+    historyTimer = window.setTimeout(snapshotNow, 250);
+  }
+
+  function restoreHistory(index) {
+    if (index < 0 || index >= history.length) return;
+    historyLock = true;
+    canvas.loadFromJSON(history[index], function () {
+      if (guideRect) {
+        canvas.add(guideRect);
+        canvas.sendToBack(guideRect);
+      }
+      canvas.renderAll();
+      historyLock = false;
+      saveState();
+    });
+  }
+
+  function undo() {
+    if (historyIndex <= 0) return;
+    historyIndex -= 1;
+    restoreHistory(historyIndex);
   }
 
   function applyGuide(state, opts) {
@@ -314,7 +460,8 @@
       var dx = nextOffset.x - currentOffset.x;
       var dy = nextOffset.y - currentOffset.y;
       if (dx || dy) {
-        getTextObjects().forEach(function (obj) {
+        canvas.getObjects().forEach(function (obj) {
+          if (!obj || obj === guideRect) return;
           obj.set({ left: obj.left + dx, top: obj.top + dy });
         });
       }
@@ -353,11 +500,13 @@
       }
       imageSize = { w: cw, h: ch };
       applyGuide(state);
+      restoreElements(state);
       label.textContent = kv.label || kv.id;
       if (bgImg) {
         log("Image element size: " + bgImg.clientWidth + "x" + bgImg.clientHeight);
       }
       log("Canvas size: " + canvas.getWidth() + "x" + canvas.getHeight());
+      snapshotNow();
     };
     probe.onerror = function () {
       log("Image onerror fired for " + kv.url);
@@ -451,11 +600,22 @@
     var state = {
       kv_asset_id: select.value,
       font_family: fontSelect.value,
-      text_color: colorInput.value,
+      text_color: colorInput ? colorInput.value : "#ffffff",
       text_align: alignSelect.value,
       font_scale: fontScale,
       guide_ratio: guideRatio,
       layers: collectTextLayers(),
+      elements: getElementObjects().map(function (obj) {
+        return {
+          asset_id: obj.pg_asset_id || "",
+          src: obj.pg_src || obj.src,
+          left: obj.left || 0,
+          top: obj.top || 0,
+          scaleX: obj.scaleX || 1,
+          scaleY: obj.scaleY || 1,
+          opacity: obj.opacity == null ? 1 : obj.opacity,
+        };
+      }),
     };
     try {
       localStorage.setItem(stateKey, JSON.stringify(state));
@@ -499,9 +659,11 @@
     }
     canvas.renderAll();
     saveState();
+    snapshotNow();
   });
   canvas.on("text:changed", function (e) {
     saveState();
+    queueSnapshot();
   });
   canvas.on("selection:created", function (e) {
     var obj = (e.selected && e.selected[0]) || canvas.getActiveObject();
@@ -522,28 +684,39 @@
   });
 
   fontSelect.addEventListener("change", updateAllStyles);
-  colorInput.addEventListener("input", updateAllStyles);
-  alignSelect.addEventListener("change", updateAllStyles);
-  if (fontSizeRange) {
-    fontSizeRange.addEventListener("input", function () {
-      var obj = getActiveText();
-      var next = parseInt(fontSizeRange.value || "12", 10) || 12;
-      if (fontSizeInput) fontSizeInput.value = String(next);
-      if (!obj) return;
-      obj.set({ fontSize: next });
-      canvas.renderAll();
-      saveState();
+  if (colorInput) {
+    colorInput.addEventListener("change", function () {
+      if (colorPicker) colorPicker.value = colorInput.value;
+      if (colorSwatch) colorSwatch.style.background = colorInput.value;
+      applyStyleToSelection();
     });
   }
-  if (fontSizeInput) {
-    fontSizeInput.addEventListener("change", function () {
-      var obj = getActiveText();
-      var next = parseInt(fontSizeInput.value || "12", 10) || 12;
-      if (fontSizeRange) fontSizeRange.value = String(next);
-      if (!obj) return;
-      obj.set({ fontSize: next });
-      canvas.renderAll();
-      saveState();
+  if (colorPicker) {
+    colorPicker.addEventListener("input", function () {
+      if (colorInput) colorInput.value = colorPicker.value;
+      if (colorSwatch) colorSwatch.style.background = colorPicker.value;
+      applyStyleToSelection();
+    });
+  }
+  alignSelect.addEventListener("change", updateAllStyles);
+  function applyFontSizeValue(next) {
+    var obj = getActiveText();
+    var size = parseInt(next || "12", 10) || 12;
+    if (fontSizeSelect) fontSizeSelect.value = String(size);
+    if (fontSizeCustom) fontSizeCustom.value = String(size);
+    if (!obj) return;
+    obj.set({ fontSize: size });
+    canvas.renderAll();
+    saveState();
+  }
+  if (fontSizeSelect) {
+    fontSizeSelect.addEventListener("change", function () {
+      applyFontSizeValue(fontSizeSelect.value);
+    });
+  }
+  if (fontSizeCustom) {
+    fontSizeCustom.addEventListener("change", function () {
+      applyFontSizeValue(fontSizeCustom.value);
     });
   }
   if (guideSelect) {
@@ -556,7 +729,7 @@
 
   document.addEventListener("keydown", function (e) {
     if (isEditableTarget(e.target)) return;
-    var obj = getActiveText();
+    var obj = getActiveObject();
     if (!obj) return;
     if (obj.isEditing) return;
     var step = e.shiftKey ? 10 : 1;
@@ -582,6 +755,7 @@
       obj.setCoords();
       canvas.renderAll();
       saveState();
+      snapshotNow();
       e.preventDefault();
     }
   });
@@ -600,24 +774,48 @@
     });
   }
   btnPreview.addEventListener("click", collectAndSubmit);
+  if (btnUndo) {
+    btnUndo.addEventListener("click", function () {
+      undo();
+    });
+  }
+  if (assetUploadBtn && assetUploadFile) {
+    assetUploadBtn.addEventListener("click", function () {
+      assetUploadFile.click();
+    });
+    assetUploadFile.addEventListener("change", function () {
+      if (!assetUploadName) return;
+      var name = assetUploadFile.files && assetUploadFile.files.length ? assetUploadFile.files[0].name : "No file selected";
+      assetUploadName.textContent = name;
+    });
+  }
   if (btnInsertText) {
     btnInsertText.addEventListener("click", function () {
       addTextBox("", defaultTextBox);
     });
   }
+  if (assetInsertButtons && assetInsertButtons.length) {
+    for (var a = 0; a < assetInsertButtons.length; a++) {
+      assetInsertButtons[a].addEventListener("click", function (e) {
+        var btn = e.currentTarget;
+        insertAssetFromUrl(btn.dataset.assetUrl, btn.dataset.insertAsset);
+      });
+    }
+  }
   if (btnDeleteText) {
     btnDeleteText.addEventListener("click", function () {
-      var obj = getActiveText();
+      var obj = getActiveObject();
       if (!obj) return;
       canvas.remove(obj);
       canvas.discardActiveObject();
       canvas.renderAll();
       saveState();
+      snapshotNow();
     });
   }
   if (btnDuplicateText) {
     btnDuplicateText.addEventListener("click", function () {
-      var obj = getActiveText();
+      var obj = getActiveObject();
       if (!obj) return;
       obj.clone(function (cloned) {
         cloned.set({ left: obj.left + 12, top: obj.top + 12 });
@@ -625,27 +823,30 @@
         canvas.setActiveObject(cloned);
         canvas.renderAll();
         saveState();
+        snapshotNow();
       });
     });
   }
   if (btnBringForward) {
     btnBringForward.addEventListener("click", function () {
-      var obj = getActiveText();
+      var obj = getActiveObject();
       if (!obj) return;
       canvas.bringForward(obj);
       if (guideRect) canvas.sendToBack(guideRect);
       canvas.renderAll();
       saveState();
+      snapshotNow();
     });
   }
   if (btnSendBack) {
     btnSendBack.addEventListener("click", function () {
-      var obj = getActiveText();
+      var obj = getActiveObject();
       if (!obj) return;
       canvas.sendBackwards(obj);
       if (guideRect) canvas.sendToBack(guideRect);
       canvas.renderAll();
       saveState();
+      snapshotNow();
     });
   }
 
@@ -661,6 +862,7 @@
     }
     canvas.renderAll();
     saveState();
+    snapshotNow();
   }
   for (var i = 0; i < copyButtons.length; i++) {
     copyButtons[i].addEventListener("click", function (e) {
@@ -674,6 +876,8 @@
     select.value = saved.kv_asset_id;
     fontSelect.value = saved.font_family || fontSelect.value;
     colorInput.value = saved.text_color || colorInput.value;
+    if (colorPicker && saved.text_color) colorPicker.value = saved.text_color;
+    if (colorSwatch && saved.text_color) colorSwatch.style.background = saved.text_color;
     alignSelect.value = saved.text_align || alignSelect.value;
     if (guideSelect && saved.guide_ratio) {
       guideSelect.value = saved.guide_ratio;

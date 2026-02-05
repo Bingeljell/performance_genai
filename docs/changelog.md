@@ -95,3 +95,10 @@
 - **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > add collapsible headlines panel with clear/delete actions and pass asset_kind for KV bulk deletes**
 - **2026-02-04 > src/performance_genai/api/app.py > delete_copy_sets > add endpoint to delete individual or all copy sets**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > add delete controls for copy sets and bump editor.js cache buster to v17**
+- **2026-02-04 > src/performance_genai/api/app.py > editor_page/upload_asset > expose insertable assets list and support editor return_to on uploads**
+- **2026-02-04 > src/performance_genai/api/templates/project.html > n/a > add element to upload kind list**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > redesign editor controls (icon toolbar, color picker dropdown, font size select, insert-asset menu) and bump cache buster to v18**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > n/a > add asset insertion, per-selection styling updates, upload button wiring, and 3-step undo history**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > polish editor icon tooltips, swap to icon glyphs, and make asset menu an overlay dropdown**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > make asset dropdown fully opaque and bump editor.js cache buster to v19**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > replace undo button label with icon glyph**

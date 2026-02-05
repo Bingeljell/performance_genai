@@ -23,6 +23,7 @@
       .title .meta { color: var(--muted); font-size: 12px; }
       .btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); color: var(--text); cursor: pointer; }
       .btn:hover { background: rgba(255,255,255,0.10); }
+      .btn-icon { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
       .layout { display:grid; grid-template-columns: 360px 1fr; gap: 14px; margin-top: 14px; }
       @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
       .panel { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: var(--panel); box-shadow: 0 10px 24px var(--shadow); }
@@ -33,11 +34,18 @@
       .muted { color: var(--muted); font-size: 12px; }
       .canvas-wrap { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: rgba(0,0,0,0.20); }
       .canvas-toolbar { display:flex; gap: 8px; align-items:center; margin-bottom: 10px; flex-wrap: wrap; }
+      .field-row { display:flex; gap: 8px; align-items: center; }
+      .asset-menu { position: relative; }
+      .asset-menu-content { display: none; position: absolute; top: 44px; left: 0; width: 360px; z-index: 60; background: #0f1a16; }
+      .asset-menu[open] .asset-menu-content { display: block; }
+      .asset-menu-content .grid { max-height: 320px; overflow: auto; }
       canvas { border-radius: 10px; background: transparent; }
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
       .thumb { width: 100%; height: auto; object-fit: contain; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.22); }
       .item { border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; padding: 10px; background: rgba(0,0,0,0.20); }
       .k { display:flex; justify-content: space-between; gap: 8px; margin-top: 8px; align-items: center; }
+      summary { list-style: none; }
+      summary::-webkit-details-marker { display: none; }
     </style>
   </head>
   <body data-project-id="{{ project.project_id }}">
@@ -76,7 +84,57 @@
           </select>
           <div class="muted" style="margin-top:6px;">Dashed frame shows the publishable area. Anything outside is outpaint zone.</div>
 
-          <button class="btn" id="btn-insert-text" type="button" style="margin-top:8px;">Insert text box</button>
+          <div class="field-row" style="margin-top:8px;">
+            <button class="btn btn-icon" id="btn-insert-text" type="button" title="Insert text box">T</button>
+            <details id="asset-menu" class="asset-menu">
+              <summary class="btn btn-icon" title="Insert asset">A</summary>
+              <div class="panel asset-menu-content">
+                <div class="muted">Insert asset from this ad set.</div>
+                {% if insert_assets %}
+                  <div class="grid" style="margin-top:10px;">
+                    {% for a in insert_assets %}
+                      <div class="item">
+                        <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
+                        <div class="k">
+                          <small class="muted">{{ a.kind }}</small>
+                          <button
+                            class="btn"
+                            type="button"
+                            data-insert-asset="{{ a.asset_id }}"
+                            data-asset-url="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}"
+                          >
+                            Insert
+                          </button>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="muted" style="margin-top:10px;">No insertable assets yet.</div>
+                {% endif %}
+                <div style="margin-top:12px;">
+                  <div class="muted">Upload new asset</div>
+                  <form method="post" action="/projects/{{ project.project_id }}/assets/upload" enctype="multipart/form-data">
+                    <label>Kind</label>
+                    <select name="kind">
+                      <option value="product">product</option>
+                      <option value="reference">reference</option>
+                      <option value="motif">motif</option>
+                      <option value="element">element</option>
+                    </select>
+                    <input type="file" id="asset-upload-file" name="file" accept="image/*" required style="display:none;" />
+                    <div class="field-row" style="margin-top:8px;">
+                      <button class="btn" id="btn-upload-asset" type="button">Upload new asset</button>
+                      <span class="muted" id="asset-upload-name">No file selected</span>
+                    </div>
+                    <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                    <button class="btn" type="submit" style="margin-top:8px;">Upload</button>
+                  </form>
+                </div>
+              </div>
+            </details>
+            <button class="btn btn-icon" id="btn-undo" type="button" title="Undo (last action)">↶</button>
+          </div>
 
           <label>Font</label>
           <select id="font-select">
@@ -86,16 +144,42 @@
           </select>
 
           <label>Text color</label>
-          <input type="text" id="color-input" value="#ffffff" />
-
-          <label>Font scale</label>
-          <input type="range" id="font-scale" min="0.6" max="1.6" step="0.05" value="1.0" />
-          <div class="muted" id="font-scale-value" style="margin-top:4px;">1.00x</div>
+          <details id="color-dropdown">
+            <summary class="btn" style="display:flex; align-items:center; gap:8px;">
+              <span id="color-swatch" style="width:18px; height:18px; border-radius:4px; border:1px solid rgba(255,255,255,0.2); display:inline-block;"></span>
+              <span class="muted">Pick color</span>
+            </summary>
+            <div class="panel" style="margin-top:8px;">
+              <div class="field-row">
+                <input type="color" id="color-picker" value="#ffffff" />
+                <input type="text" id="color-input" value="#ffffff" placeholder="#ffffff" />
+              </div>
+            </div>
+          </details>
 
           <label>Font size (selected)</label>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <input type="range" id="font-size" min="10" max="200" step="1" value="48" style="flex:1;" />
-            <input type="number" id="font-size-number" min="8" max="240" step="1" value="48" style="width:80px;" />
+          <div class="field-row">
+            <select id="font-size-select">
+              <option value="">custom</option>
+              <option value="10">10</option>
+              <option value="12">12</option>
+              <option value="14">14</option>
+              <option value="16">16</option>
+              <option value="18">18</option>
+              <option value="20">20</option>
+              <option value="24">24</option>
+              <option value="28">28</option>
+              <option value="32">32</option>
+              <option value="36">36</option>
+              <option value="40">40</option>
+              <option value="48" selected>48</option>
+              <option value="56">56</option>
+              <option value="64">64</option>
+              <option value="72">72</option>
+              <option value="96">96</option>
+              <option value="120">120</option>
+            </select>
+            <input type="text" id="font-size-custom" placeholder="custom" />
           </div>
 
           <label>Align</label>
@@ -104,11 +188,11 @@
             <option value="center">center</option>
           </select>
 
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-            <button class="btn" id="btn-delete-text" type="button">Delete selected</button>
-            <button class="btn" id="btn-duplicate-text" type="button">Duplicate</button>
-            <button class="btn" id="btn-bring-forward" type="button">Bring forward</button>
-            <button class="btn" id="btn-send-back" type="button">Send back</button>
+          <div class="field-row" style="margin-top:10px; flex-wrap:wrap;">
+            <button class="btn btn-icon" id="btn-delete-text" type="button" title="Delete selected">🗑</button>
+            <button class="btn btn-icon" id="btn-duplicate-text" type="button" title="Duplicate selected">⧉</button>
+            <button class="btn btn-icon" id="btn-bring-forward" type="button" title="Bring forward">↑</button>
+            <button class="btn btn-icon" id="btn-send-back" type="button" title="Send back">↓</button>
           </div>
 
           <div class="muted" style="margin-top:10px;">Drag and resize text boxes on the canvas. Use handles to scale.</div>
@@ -256,6 +340,6 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=17"></script>
+    <script src="/static/editor.js?v=19"></script>
   </body>
 </html>

@@ -200,6 +200,7 @@ def editor_page(request: Request, project_id: str):
         copy_sets = []
 
     text_previews = [a for a in assets if a.kind == "text_preview"]
+    insert_assets = [a for a in assets if a.kind in ("element", "motif", "product")]
     return templates.TemplateResponse(
         request=request,
         name="editor.html",
@@ -210,6 +211,7 @@ def editor_page(request: Request, project_id: str):
             "selected_kv": selected_kv,
             "copy_sets": copy_sets,
             "text_previews": text_previews,
+            "insert_assets": insert_assets,
         },
     )
 
@@ -218,6 +220,7 @@ def editor_page(request: Request, project_id: str):
 async def upload_asset(
     project_id: str,
     kind: str = Form("reference"),
+    return_to: str = Form(""),
     file: UploadFile = File(...),
 ):
     content = await file.read()
@@ -232,7 +235,8 @@ async def upload_asset(
         metadata={"content_type": file.content_type},
         subdir=subdir,
     )
-    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    redirect_path = _safe_return_path(return_to) or f"/projects/{project_id}"
+    return RedirectResponse(url=redirect_path, status_code=303)
 
 @app.post("/projects/{project_id}/delete")
 def delete_project(project_id: str):
