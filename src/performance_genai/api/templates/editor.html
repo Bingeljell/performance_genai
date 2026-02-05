@@ -320,7 +320,12 @@
                         <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
                       <div class="k">
                         <small class="muted">{{ a.metadata.ratio }}</small>
-                        <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                          <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                          {% if a.metadata.ratio_layout_id %}
+                            <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">open in editor</a>
+                          {% endif %}
+                        </div>
                       </div>
                       {% if a.metadata.debug_text_layers %}
                         <details style="margin-top:6px;">
@@ -357,6 +362,9 @@
     </div>
 
     <script id="kv-data" type="application/json">{{ kv_choices_json | safe }}</script>
-    <script src="/static/editor.js?v=22"></script>
+    {% if editor_layout %}
+      <script id="layout-data" type="application/json">{{ editor_layout | tojson }}</script>
+    {% endif %}
+    <script src="/static/editor.js?v=23"></script>
   </body>
 </html>

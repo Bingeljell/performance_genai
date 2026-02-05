@@ -193,7 +193,7 @@ def render_text_layers(
     for layer in text_layers or []:
         if not isinstance(layer, dict):
             continue
-        text = (layer.get("text") or "").strip()
+        text = (layer.get("text_wrapped") or layer.get("text") or "").strip()
         if not text:
             continue
         box = layer.get("box") or {}
@@ -212,8 +212,16 @@ def render_text_layers(
         x1, y1, x2, y2 = px_box
         max_w = max(1, x2 - x1)
 
+        font_px = None
+        if layer.get("font_px") is not None and layer.get("font_base_width"):
+            try:
+                font_px = float(layer.get("font_px")) * (size[0] / float(layer.get("font_base_width")))
+            except (TypeError, ValueError, ZeroDivisionError):
+                font_px = None
         font_size_box_norm = layer.get("font_size_box_norm")
-        if font_size_box_norm is not None:
+        if font_px is not None:
+            font_px = max(10, int(font_px))
+        elif font_size_box_norm is not None:
             try:
                 font_px = max(10, int(float(font_size_box_norm) * (y2 - y1)))
             except (TypeError, ValueError):
@@ -231,7 +239,11 @@ def render_text_layers(
         layer_font_family = layer.get("font_family") or font_family
         font = _load_font(font_px, font_family=layer_font_family)
         spacing = max(2, int(font_px * 0.18))
-        wrapped = _wrap_to_width(draw, text, font, max_w)
+        text_wrapped = layer.get("text_wrapped")
+        if isinstance(text_wrapped, str) and text_wrapped.strip():
+            wrapped = text_wrapped
+        else:
+            wrapped = _wrap_to_width(draw, text, font, max_w)
 
         align = (layer.get("align") or default_align).strip().lower()
         color_hex = layer.get("color") or text_color_hex

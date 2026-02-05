@@ -119,3 +119,13 @@
 - **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > include debug metadata for text layer boxes and image/guide context on previews**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > show per-preview debug layer dump and bump cache buster to v22**
 - **2026-02-04 > src/performance_genai/assembly/render.py > _load_font > add cross-platform fallback fonts so previews don't use tiny default bitmap font**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers/restoreElements > preserve unclamped boxes and restore ratio layouts into the editor**
+- **2026-02-04 > src/performance_genai/api/app.py > preview_text_layout > include debug render layer values for font sizing**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers/resetTextBoxes > store absolute font_px with base width and use it to keep size consistent across ratios**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers > honor font_px/font_base_width for preview sizing before other fallbacks**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers > capture Fabric-wrapped text lines to keep preview line breaks consistent**
+- **2026-02-04 > src/performance_genai/assembly/render.py > render_text_layers > honor text_wrapped from editor to prevent unexpected line wraps**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > collectTextLayers > fix wrapped text extraction for Fabric line arrays and bump editor.js cache buster to v23**
+- **2026-02-05 > docs/pending_bugs.md > n/a > add note about preview headline wrapping mismatch vs editor**
+- **2026-02-05 > src/performance_genai/assembly/render.py > render_text_layers > skip auto-wrap when text_wrapped is provided to mirror editor line breaks**
+- **2026-02-05 > docs/pending_bugs.md > n/a > mark preview headline wrapping issue as resolved**

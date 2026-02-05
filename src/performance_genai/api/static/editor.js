@@ -23,6 +23,7 @@
     }
   var kvDataEl = document.getElementById("kv-data");
   if (!kvDataEl) return;
+  var layoutDataEl = document.getElementById("layout-data");
 
   var projectId = (document.body && document.body.dataset && document.body.dataset.projectId) || "default";
   var stateKey = "pg_editor_state_" + projectId;
@@ -44,6 +45,15 @@
   kvs.forEach(function (k) {
     kvMap[k.id] = k;
   });
+
+  var layoutData = null;
+  if (layoutDataEl) {
+    try {
+      layoutData = JSON.parse(layoutDataEl.textContent || "null");
+    } catch (e) {
+      layoutData = null;
+    }
+  }
 
   var select = document.getElementById("kv-select");
   var label = document.getElementById("kv-label");
@@ -265,7 +275,11 @@
         fontFamily: layer.font_family || fontSelect.value,
         fill: layer.color || colorInput.value,
         align: layer.align || alignSelect.value,
-        fontSizePx: layer.font_size_norm ? layer.font_size_norm * base.width : null,
+        fontSizePx: (layer.font_px && layer.font_base_width)
+          ? (layer.font_px * (base.width / layer.font_base_width))
+          : (layer.font_size_box_norm
+            ? layer.font_size_box_norm * (box.h * base.height)
+            : (layer.font_size_norm ? layer.font_size_norm * base.width : null)),
       };
       createText(layer.text || "", box, opts);
     });
@@ -294,14 +308,33 @@
     if (!state || !state.elements || !state.elements.length) {
       return;
     }
+    var base = getGuideBounds();
     state.elements.forEach(function (el) {
       if (!el || !el.src) return;
+      var box = el.box || null;
       fabric.Image.fromURL(el.src, function (img) {
+        var left = el.left || 0;
+        var top = el.top || 0;
+        var scaleX = el.scaleX || 1;
+        var scaleY = el.scaleY || 1;
+        if (box && base && base.width && base.height) {
+          var bw = box.w * base.width;
+          var bh = box.h * base.height;
+          var cx = base.left + (box.x + box.w / 2) * base.width;
+          var cy = base.top + (box.y + box.h / 2) * base.height;
+          var ratio = img.width / Math.max(1, img.height);
+          var targetW = Math.max(1, bw);
+          var targetH = Math.max(1, targetW / ratio);
+          scaleX = targetW / img.width;
+          scaleY = targetH / img.height;
+          left = cx - (targetW / 2);
+          top = cy - (targetH / 2);
+        }
         img.set({
-          left: el.left || 0,
-          top: el.top || 0,
-          scaleX: el.scaleX || 1,
-          scaleY: el.scaleY || 1,
+          left: left,
+          top: top,
+          scaleX: scaleX,
+          scaleY: scaleY,
           opacity: el.opacity == null ? 1 : el.opacity,
           cornerColor: "#8fe4c7",
           borderColor: "#8fe4c7",
@@ -563,14 +596,27 @@
     for (var i = 0; i < objs.length; i++) {
       var obj = objs[i];
       var rect = obj.getBoundingRect(true);
+      var wrapped = obj.text || "";
+      if (obj._textLines && obj._textLines.length) {
+        wrapped = obj._textLines.map(function (line) {
+          return Array.isArray(line) ? line.join("") : line;
+        }).join("\n");
+      } else if (obj.textLines && obj.textLines.length) {
+        wrapped = obj.textLines.map(function (line) {
+          return Array.isArray(line) ? line.join("") : line;
+        }).join("\n");
+      }
       layers.push({
         text: obj.text || "",
+        text_wrapped: wrapped,
         box: {
           x: (rect.left - base.left) / base.width,
           y: (rect.top - base.top) / base.height,
           w: rect.width / base.width,
           h: rect.height / base.height,
         },
+        font_px: obj.fontSize || 12,
+        font_base_width: base.width,
         font_size_norm: (obj.fontSize || 12) / base.width,
         font_size_box_norm: (obj.fontSize || 12) / Math.max(1, rect.height),
         font_family: obj.fontFamily || fontSelect.value,
@@ -1026,7 +1072,43 @@
   }
 
   var saved = loadState();
-  if (saved && saved.kv_asset_id && kvMap[saved.kv_asset_id]) {
+  if (layoutData && layoutData.kv_asset_id && kvMap[layoutData.kv_asset_id]) {
+    select.value = layoutData.kv_asset_id;
+    fontSelect.value = layoutData.font_family || fontSelect.value;
+    if (layoutData.text_color) {
+      if (colorInput) colorInput.value = layoutData.text_color;
+      if (colorPicker) colorPicker.value = layoutData.text_color;
+      if (colorSwatch) colorSwatch.style.background = layoutData.text_color;
+    }
+    alignSelect.value = layoutData.text_align || alignSelect.value;
+    if (guideSelect && layoutData.guide_ratio) {
+      guideSelect.value = layoutData.guide_ratio;
+    }
+    guideRatio = (guideSelect && guideSelect.value) || guideRatio;
+    var layoutState = {
+      layers: (layoutData.text_layers || []).map(function (layer) {
+        if (!layer || !layer.box) return layer;
+        var b = layer.box;
+        return Object.assign({}, layer, {
+          box: { x: b.x, y: b.y, w: b.w, h: b.h },
+          text_wrapped: layer.text_wrapped || layer.text || "",
+          font_px: layer.font_px || null,
+          font_base_width: layer.font_base_width || null,
+          font_size_box_norm: layer.font_size_box_norm || layer.font_size_norm || null,
+        });
+      }),
+      elements: (layoutData.elements || []).map(function (el) {
+        if (!el) return el;
+        return {
+          asset_id: el.asset_id,
+          src: (el.asset_id ? ("/projects/" + projectId + "/assets/" + el.asset_id) : (el.src || "")),
+          box: el.box || null,
+          opacity: el.opacity == null ? 1 : el.opacity,
+        };
+      }),
+    };
+    setBackground(kvMap[layoutData.kv_asset_id], layoutState);
+  } else if (saved && saved.kv_asset_id && kvMap[saved.kv_asset_id]) {
     select.value = saved.kv_asset_id;
     fontSelect.value = saved.font_family || fontSelect.value;
     colorInput.value = saved.text_color || colorInput.value;

@@ -175,7 +175,7 @@ def project_page(request: Request, project_id: str):
 
 
 @app.get("/projects/{project_id}/editor", response_class=HTMLResponse)
-def editor_page(request: Request, project_id: str):
+def editor_page(request: Request, project_id: str, layout_id: str = ""):
     proj = store.read_project(project_id)
     assets = list(reversed(proj.assets))
     kvs = [a for a in assets if a.kind == "kv"]
@@ -189,6 +189,15 @@ def editor_page(request: Request, project_id: str):
         for a in base_kvs
     ]
     selected_kv = request.query_params.get("kv") or ""
+    editor_layout: dict | None = None
+    if layout_id:
+        try:
+            proj_dir = Path(settings.data_dir) / "projects" / project_id
+            layout_path = proj_dir / "layouts" / f"layout_{layout_id}.json"
+            if layout_path.exists():
+                editor_layout = json.loads(layout_path.read_text("utf-8"))
+        except Exception:
+            editor_layout = None
 
     copy_sets: list[dict[str, str]] = []
     try:
@@ -212,6 +221,7 @@ def editor_page(request: Request, project_id: str):
             "copy_sets": copy_sets,
             "text_previews": text_previews,
             "insert_assets": insert_assets,
+            "editor_layout": editor_layout,
         },
     )
 
