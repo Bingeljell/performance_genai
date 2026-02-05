@@ -145,3 +145,4 @@
 - **2026-02-05 > src/performance_genai/api/static/editor.js > applyGuide/setBackground/collectImageBox > add oversized canvas padding and make KV background movable within the canvas**
 - **2026-02-05 > src/performance_genai/api/static/editor.js > saveState/restoreHistory > persist background position via image_box and restore KV object on undo**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > remove static KV img tag and bump editor.js cache buster to v24**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add a subtle border around the canvas stage for clearer bounds**
