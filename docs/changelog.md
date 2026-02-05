@@ -102,3 +102,5 @@
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > polish editor icon tooltips, swap to icon glyphs, and make asset menu an overlay dropdown**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > make asset dropdown fully opaque and bump editor.js cache buster to v19**
 - **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > replace undo button label with icon glyph**
+- **2026-02-04 > src/performance_genai/api/static/editor.js > normalizeObjectScale > avoid scaling non-text objects to prevent image skew on selection**
+- **2026-02-04 > src/performance_genai/api/templates/editor.html > n/a > update undo icon glyph**

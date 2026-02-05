@@ -161,7 +161,7 @@
   }
 
   function normalizeObjectScale(obj) {
-    if (!obj) return;
+    if (!obj || obj.type !== "textbox") return;
     var sx = obj.scaleX || 1;
     var sy = obj.scaleY || 1;
     if (sx !== 1) {
