@@ -4,45 +4,60 @@
     <meta charset="utf-8" />
     <title>{{ project.name }} — Editor</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
       :root {
-        --bg: #0f1a16;
-        --panel: rgba(255,255,255,0.06);
+        --bg: #0b0c10;
+        --bg2: #141920;
+        --panel: rgba(18, 21, 26, 0.86);
+        --panel2: rgba(24, 28, 34, 0.92);
         --stroke: rgba(255,255,255,0.12);
-        --text: rgba(255,255,255,0.94);
-        --muted: rgba(255,255,255,0.70);
-        --link: #8fe4c7;
-        --shadow: rgba(0,0,0,0.35);
+        --text: #f5f3ee;
+        --muted: rgba(245,243,238,0.70);
+        --link: #f7f5f0;
+        --shadow: rgba(0,0,0,0.40);
+        --accent: #f2f0ea;
+        --accent-text: #0b0c10;
       }
-      body { background: radial-gradient(1200px 700px at 15% 0%, rgba(143,228,199,0.14), transparent 60%), var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Arial; margin: 0; }
+      body {
+        background: radial-gradient(1200px 700px at 15% 0%, rgba(255,255,255,0.10), transparent 60%), linear-gradient(145deg, var(--bg), var(--bg2));
+        color: var(--text);
+        font-family: "Manrope", ui-sans-serif, system-ui;
+        margin: 0;
+      }
       a { color: var(--link); text-decoration: none; }
       a:hover { text-decoration: underline; }
-      .wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 30px; }
-      .topbar { display:flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 14px; background: var(--panel); box-shadow: 0 12px 30px var(--shadow); }
+      .wrap { max-width: 1400px; margin: 0 auto; padding: 20px 18px 34px; }
+      .topbar { display:flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 16px; background: var(--panel); box-shadow: 0 12px 30px var(--shadow); }
       .title { display:flex; flex-direction: column; gap: 2px; }
-      .title h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
+      .title h1 { font-size: 20px; margin: 0; letter-spacing: 0.2px; font-family: "Space Grotesk", "Manrope", sans-serif; }
       .title .meta { color: var(--muted); font-size: 12px; }
-      .btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); color: var(--text); cursor: pointer; }
-      .btn:hover { background: rgba(255,255,255,0.10); }
+      .btn { padding: 8px 12px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); color: var(--text); cursor: pointer; font-family: "Manrope", ui-sans-serif, system-ui; }
+      .btn:hover { background: rgba(255,255,255,0.12); }
+      .btn-primary { background: var(--accent); color: var(--accent-text); border-color: rgba(255,255,255,0.45); }
+      .btn-primary:hover { filter: brightness(0.96); }
+      .btn-danger { background: rgba(182,69,85,0.22); border-color: rgba(182,69,85,0.5); color: var(--text); }
+      .btn-danger:hover { background: rgba(182,69,85,0.30); }
       .btn-icon { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
       .layout { display:grid; grid-template-columns: 360px 1fr; gap: 14px; margin-top: 14px; }
       @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
-      .panel { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: var(--panel); box-shadow: 0 10px 24px var(--shadow); }
+      .panel { border: 1px solid var(--stroke); border-radius: 14px; padding: 14px; background: var(--panel2); box-shadow: 0 10px 24px var(--shadow); }
+      form { max-width: 100%; }
       .panel h2 { font-size: 14px; margin: 0 0 10px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86); }
       label { display:block; font-size: 12px; color: var(--muted); margin-top: 8px; }
-      textarea { width: 100%; min-height: 70px; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.22); color: var(--text); }
-      input[type=text], select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.22); color: var(--text); }
+      textarea { width: 100%; min-height: 70px; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.28); color: var(--text); resize: vertical; }
+      input[type=text], select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.28); color: var(--text); }
       .muted { color: var(--muted); font-size: 12px; }
-      .canvas-wrap { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: rgba(0,0,0,0.20); }
+      .canvas-wrap { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: rgba(0,0,0,0.24); }
       .canvas-toolbar { display:flex; gap: 8px; align-items:center; margin-bottom: 10px; flex-wrap: wrap; }
       .field-row { display:flex; gap: 8px; align-items: center; }
       .asset-menu { position: relative; }
-      .asset-menu-content { display: none; position: absolute; top: 44px; left: 0; width: 360px; z-index: 60; background: #0f1a16; }
+      .asset-menu-content { display: none; position: absolute; top: 44px; left: 0; width: 360px; z-index: 60; background: rgba(16, 19, 26, 0.98); }
       .asset-menu[open] .asset-menu-content { display: block; }
       .asset-menu-content .grid { max-height: 320px; overflow: auto; }
       .layer-list { display:flex; flex-direction: column; gap: 6px; margin-top: 10px; }
       .layer-row { display:flex; align-items:center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: rgba(0,0,0,0.18); cursor: pointer; }
       .layer-row:hover { background: rgba(255,255,255,0.06); }
-      .layer-row.active { border-color: rgba(143,228,199,0.5); background: rgba(143,228,199,0.12); }
+      .layer-row.active { border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.08); }
       .layer-row .label { font-size: 12px; color: var(--muted); }
       .layer-controls { display:flex; gap: 6px; }
       canvas { border-radius: 10px; background: transparent; }
@@ -134,7 +149,7 @@
                       <span class="muted" id="asset-upload-name">No file selected</span>
                     </div>
                     <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                    <button class="btn" type="submit" style="margin-top:8px;">Upload</button>
+                    <button class="btn btn-primary" type="submit" style="margin-top:8px;">Upload</button>
                   </form>
                 </div>
               </div>
@@ -206,7 +221,7 @@
 
           <label>Layers</label>
           <div id="layer-panel" class="layer-list"></div>
-          <button class="btn" id="btn-preview" type="button" style="margin-top:10px;">Generate previews (1:1, 4:5, 9:16)</button>
+          <button class="btn btn-primary" id="btn-preview" type="button" style="margin-top:10px;">Generate previews (1:1, 4:5, 9:16)</button>
 
           <div style="margin-top:16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.10);">
             <div style="font-size: 14px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86);">Copy Sets</div>
@@ -221,7 +236,7 @@
               <label>Count</label>
               <input type="text" name="count" value="8" />
               <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-              <button class="btn" type="submit" style="margin-top:10px;">Generate copy sets</button>
+              <button class="btn btn-primary" type="submit" style="margin-top:10px;">Generate copy sets</button>
             </form>
 
             {% if copy_sets %}
@@ -252,7 +267,7 @@
                         Insert set
                       </button>
                       <button
-                        class="btn"
+                        class="btn btn-danger"
                         type="submit"
                         form="copy-set-delete-{{ loop.index0 }}"
                         onclick="return confirm('Delete this copy set?');"
@@ -339,7 +354,7 @@
                             select
                           </label>
                           <button
-                            class="btn"
+                            class="btn btn-danger"
                             type="submit"
                             formaction="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete"
                             formmethod="post"
@@ -352,7 +367,7 @@
                     {% endfor %}
                   </div>
                   <div class="k" style="margin-top:10px;">
-                    <button class="btn" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
+                    <button class="btn btn-danger" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
                   </div>
                 </form>
               </div>

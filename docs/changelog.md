@@ -129,3 +129,6 @@
 - **2026-02-05 > docs/pending_bugs.md > n/a > add note about preview headline wrapping mismatch vs editor**
 - **2026-02-05 > src/performance_genai/assembly/render.py > render_text_layers > skip auto-wrap when text_wrapped is provided to mirror editor line breaks**
 - **2026-02-05 > docs/pending_bugs.md > n/a > mark preview headline wrapping issue as resolved**
+- **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > refresh landing page typography/palette and add premium hero styling**
+- **2026-02-05 > src/performance_genai/api/templates/project.html > n/a > apply charcoal UI theme, widen layout, and tighten form/button styling**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > align editor styling with new palette and promote primary/danger actions**

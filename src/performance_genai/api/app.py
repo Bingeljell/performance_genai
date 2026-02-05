@@ -101,14 +101,18 @@ def _build_reframe_constraints(has_motif: bool) -> str:
 def index(request: Request):
     projects = store.list_projects()
     grouped: dict[str, dict[str, list[Any]]] = {}
+    brand_options: list[str] = []
     for p in projects:
         brand = (p.brand_name or "").strip() or "Unassigned"
         campaign = (p.campaign_name or "").strip() or "Unassigned"
         grouped.setdefault(brand, {}).setdefault(campaign, []).append(p)
+        if brand and brand != "Unassigned":
+            brand_options.append(brand)
+    brand_options = sorted(set(brand_options))
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"projects": projects, "grouped": grouped},
+        context={"projects": projects, "grouped": grouped, "brand_options": brand_options},
     )
 
 
