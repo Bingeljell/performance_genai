@@ -18,11 +18,13 @@
         --accent: #f2f0ea;
         --accent-text: #0b0c10;
       }
+      * { box-sizing: border-box; }
       body {
         background: radial-gradient(1200px 700px at 15% 0%, rgba(255,255,255,0.10), transparent 60%), linear-gradient(145deg, var(--bg), var(--bg2));
         color: var(--text);
         font-family: "Manrope", ui-sans-serif, system-ui;
         margin: 0;
+        overflow-x: hidden;
       }
       a { color: var(--link); text-decoration: none; }
       a:hover { text-decoration: underline; }
@@ -49,7 +51,7 @@
       textarea { width: 100%; min-height: 70px; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.28); color: var(--text); resize: vertical; }
       input[type=text], select { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0,0,0,0.28); color: var(--text); }
       .muted { color: var(--muted); font-size: 12px; }
-      .canvas-wrap { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: rgba(0,0,0,0.24); }
+      .canvas-wrap { border: 1px solid var(--stroke); border-radius: 14px; padding: 12px; background: rgba(0,0,0,0.24); max-width: 100%; overflow-x: auto; }
       .canvas-toolbar { display:flex; gap: 8px; align-items:center; margin-bottom: 10px; flex-wrap: wrap; }
       .field-row { display:flex; gap: 8px; align-items: center; }
       .asset-menu { position: relative; }

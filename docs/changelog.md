@@ -137,3 +137,5 @@
 - **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > add logo header and chevron indicators for campaign accordions**
 - **2026-02-05 > src/performance_genai/api/templates/project.html > n/a > add horizontal logo to inner page topbar**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > add horizontal logo and expand editor layout to full viewport width**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > prevent page-level horizontal scroll by constraining canvas wrap overflow**
+- **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > apply border-box sizing to avoid width overflow and clipped labels**
