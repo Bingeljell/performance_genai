@@ -132,3 +132,6 @@
 - **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > refresh landing page typography/palette and add premium hero styling**
 - **2026-02-05 > src/performance_genai/api/templates/project.html > n/a > apply charcoal UI theme, widen layout, and tighten form/button styling**
 - **2026-02-05 > src/performance_genai/api/templates/editor.html > n/a > align editor styling with new palette and promote primary/danger actions**
+- **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > restructure landing page into brand cards with collapsible campaign sections**
+- **2026-02-05 > src/performance_genai/api/app.py > n/a > mount repo-level assets directory for logo use on landing page**
+- **2026-02-05 > src/performance_genai/api/templates/index.html > n/a > add logo header and chevron indicators for campaign accordions**

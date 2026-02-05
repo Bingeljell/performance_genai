@@ -26,6 +26,9 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 static_dir = BASE_DIR / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+assets_dir = BASE_DIR.parents[2] / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
 store = ProjectStore()
 
