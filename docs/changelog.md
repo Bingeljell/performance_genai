@@ -162,3 +162,5 @@
 - **2026-02-05 > src/performance_genai/api/static/editor.js > updateTextBackground/collectTextLayers > add padding around text backgrounds and persist padding for previews**
 - **2026-02-05 > src/performance_genai/assembly/render.py > render_text_layers > expand text background by padding to avoid clipped rounded corners**
 - **2026-02-05 > src/performance_genai/api/app.py > delete_asset/bulk_delete_assets/outpaint_layout > cascade-delete outpainted KV assets when removing previews**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > reorganize editor into grouped control sections, add dedicated Copy Sets/Recent Previews panels, and add Center guide canvas action**
+- **2026-02-06 > src/performance_genai/api/static/editor.js > centerGuideInViewport/finishPan and key+mouse handlers > add Space+drag canvas panning and center-guide viewport helper without changing layout export coordinates**

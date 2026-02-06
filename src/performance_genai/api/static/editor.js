@@ -76,6 +76,8 @@
   var layerPanel = document.getElementById("layer-panel");
   var ratioLabel = document.getElementById("ratio-label");
   var loadingOverlay = document.getElementById("loading-overlay");
+  var canvasWrap = document.getElementById("canvas-wrap");
+  var btnCenterGuide = document.getElementById("btn-center-guide");
 
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
@@ -138,6 +140,12 @@
   var historyTimer = null;
   var lastSnapshot = "";
   var historyLimit = 3;
+  var isSpaceDown = false;
+  var isPanDragging = false;
+  var panStartX = 0;
+  var panStartY = 0;
+  var panStartLeft = 0;
+  var panStartTop = 0;
 
   function showLoader() {
     if (loadingOverlay) {
@@ -355,6 +363,26 @@
   function getGuideBounds() {
     if (guideBounds && guideBounds.width && guideBounds.height) return guideBounds;
     return { left: 0, top: 0, width: canvasSize.w, height: canvasSize.h };
+  }
+
+  function centerGuideInViewport() {
+    if (!canvasWrap) return;
+    var guide = getGuideBounds();
+    var targetLeft = (guide.left + (guide.width / 2)) - (canvasWrap.clientWidth / 2);
+    var targetTop = (guide.top + (guide.height / 2)) - (canvasWrap.clientHeight / 2);
+    canvasWrap.scrollLeft = Math.max(0, Math.round(targetLeft));
+    canvasWrap.scrollTop = Math.max(0, Math.round(targetTop));
+  }
+
+  function finishPan() {
+    if (!isPanDragging) return;
+    isPanDragging = false;
+    if (canvasWrap) {
+      canvasWrap.classList.remove("panning");
+    }
+    canvas.defaultCursor = "default";
+    canvas.skipTargetFind = false;
+    canvas.selection = true;
   }
 
   function normalizeObjectScale(obj) {
@@ -810,6 +838,7 @@
     currentOffset = nextOffset;
     canvas.renderAll();
     updateRatioLabel();
+    centerGuideInViewport();
   }
 
   function setBackground(kv, state) {
@@ -861,6 +890,7 @@
       label.textContent = kv.label || kv.id;
       log("Canvas size: " + canvas.getWidth() + "x" + canvas.getHeight());
       canvas.renderAll();
+      centerGuideInViewport();
       snapshotNow();
     }, { crossOrigin: "anonymous" });
   }
@@ -1430,6 +1460,14 @@
 
   document.addEventListener("keydown", function (e) {
     if (isEditableTarget(e.target)) return;
+    if (e.code === "Space" || e.key === " ") {
+      if (!isSpaceDown) {
+        isSpaceDown = true;
+        if (canvasWrap) canvasWrap.classList.add("panning");
+      }
+      e.preventDefault();
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
       undo();
       e.preventDefault();
@@ -1475,6 +1513,43 @@
       e.preventDefault();
     }
   });
+  document.addEventListener("keyup", function (e) {
+    if (e.code === "Space" || e.key === " ") {
+      isSpaceDown = false;
+      finishPan();
+      if (canvasWrap) canvasWrap.classList.remove("panning");
+      e.preventDefault();
+    }
+  });
+  if (canvasWrap) {
+    canvasWrap.addEventListener("mousedown", function (e) {
+      if (!isSpaceDown) return;
+      isPanDragging = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      panStartLeft = canvasWrap.scrollLeft;
+      panStartTop = canvasWrap.scrollTop;
+      canvas.defaultCursor = "grabbing";
+      canvas.skipTargetFind = true;
+      canvas.selection = false;
+      e.preventDefault();
+    });
+  }
+  window.addEventListener("mousemove", function (e) {
+    if (!isPanDragging || !canvasWrap) return;
+    var dx = e.clientX - panStartX;
+    var dy = e.clientY - panStartY;
+    canvasWrap.scrollLeft = panStartLeft - dx;
+    canvasWrap.scrollTop = panStartTop - dy;
+  });
+  window.addEventListener("mouseup", function () {
+    finishPan();
+  });
+  if (btnCenterGuide) {
+    btnCenterGuide.addEventListener("click", function () {
+      centerGuideInViewport();
+    });
+  }
   if (fontScaleInput) {
     fontScaleInput.addEventListener("input", function () {
       var next = parseFloat(fontScaleInput.value || "1") || 1;
