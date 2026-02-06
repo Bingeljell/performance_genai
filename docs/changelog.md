@@ -164,3 +164,6 @@
 - **2026-02-05 > src/performance_genai/api/app.py > delete_asset/bulk_delete_assets/outpaint_layout > cascade-delete outpainted KV assets when removing previews**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > reorganize editor into grouped control sections, add dedicated Copy Sets/Recent Previews panels, and add Center guide canvas action**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > centerGuideInViewport/finishPan and key+mouse handlers > add Space+drag canvas panning and center-guide viewport helper without changing layout export coordinates**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > move Copy Sets and Recent Previews into collapsible RHS overlay panels and add zoom toolbar controls**
+- **2026-02-06 > src/performance_genai/api/static/editor.js > deadzone overlay + zoom/pan handlers > render dotted dead area outside guide, add zoom in/out/fit controls, and support space-drag panning with zoom-aware viewport movement**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > restyle RHS overlay triggers with stronger visual hierarchy and add live count chips for copy sets and previews**

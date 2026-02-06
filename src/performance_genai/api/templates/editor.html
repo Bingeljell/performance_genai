@@ -45,8 +45,6 @@
       .layout { display:grid; grid-template-columns: 340px minmax(0, 1fr); gap: 14px; margin-top: 14px; align-items: start; }
       @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
       .canvas-column { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-      .support-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-      @media (max-width: 1200px) { .support-grid { grid-template-columns: 1fr; } }
       .panel { border: 1px solid var(--stroke); border-radius: 14px; padding: 14px; background: var(--panel2); box-shadow: 0 10px 24px var(--shadow); }
       form { max-width: 100%; }
       .panel h2 { font-size: 14px; margin: 0 0 10px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86); }
@@ -61,6 +59,63 @@
       .canvas-wrap.panning { cursor: grabbing; user-select: none; }
       #canvas-stage { border: 1px dashed rgba(255,255,255,0.18); border-radius: 12px; padding: 10px; }
       .canvas-toolbar { display:flex; gap: 8px; align-items:center; margin-bottom: 10px; flex-wrap: wrap; }
+      .zoom-controls { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+      .zoom-readout { min-width: 54px; text-align: center; font-size: 12px; color: var(--muted); }
+      .rhs-overlays { position: fixed; right: 18px; top: 96px; z-index: 95; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; width: auto; }
+      .overlay-panel > summary {
+        list-style: none;
+        padding: 0;
+        border: 1px solid rgba(255,255,255,0.20);
+        border-radius: 14px;
+        background: linear-gradient(160deg, rgba(245,243,238,0.14), rgba(245,243,238,0.04));
+        color: var(--text);
+        cursor: pointer;
+        min-width: 184px;
+        box-shadow: 0 12px 28px rgba(0,0,0,0.42);
+        transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+      }
+      .overlay-panel > summary:hover {
+        transform: translateY(-1px);
+        border-color: rgba(255,255,255,0.34);
+        background: linear-gradient(160deg, rgba(245,243,238,0.20), rgba(245,243,238,0.07));
+      }
+      .overlay-panel[open] > summary {
+        border-color: rgba(255,255,255,0.42);
+        background: linear-gradient(160deg, rgba(245,243,238,0.25), rgba(245,243,238,0.10));
+      }
+      .overlay-panel > summary::-webkit-details-marker { display: none; }
+      .overlay-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 12px;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+      }
+      .overlay-trigger .name {
+        color: rgba(255,255,255,0.96);
+        font-weight: 700;
+      }
+      .overlay-trigger .meta {
+        color: rgba(255,255,255,0.74);
+        font-weight: 600;
+        font-size: 11px;
+        border: 1px solid rgba(255,255,255,0.22);
+        border-radius: 999px;
+        padding: 2px 7px;
+        min-width: 26px;
+        text-align: center;
+      }
+      .overlay-panel .overlay-body { margin-top: 8px; width: min(430px, 38vw); max-height: calc(100vh - 170px); overflow: auto; border: 1px solid var(--stroke); border-radius: 14px; background: var(--panel2); padding: 14px; box-shadow: 0 12px 28px var(--shadow); }
+      .overlay-title { font-size: 14px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86); margin-bottom: 6px; }
+      @media (max-width: 1200px) {
+        .rhs-overlays { position: static; align-items: stretch; }
+        .overlay-panel > summary { min-width: 0; }
+        .overlay-panel .overlay-body { width: 100%; max-height: none; }
+      }
       .field-row { display:flex; gap: 8px; align-items: center; }
       .asset-menu { position: relative; }
       .asset-menu-content { display: none; position: absolute; top: 44px; left: 0; width: 360px; z-index: 60; background: rgba(16, 19, 26, 0.98); }
@@ -308,6 +363,12 @@
                 <span class="muted" id="kv-label">No visual selected</span>
                 <span class="muted" id="ratio-label"></span>
                 <button class="btn" id="btn-center-guide" type="button">Center guide</button>
+                <div class="zoom-controls">
+                  <button class="btn btn-icon" id="btn-zoom-out" type="button" title="Zoom out">-</button>
+                  <span class="zoom-readout" id="zoom-readout">100%</span>
+                  <button class="btn btn-icon" id="btn-zoom-in" type="button" title="Zoom in">+</button>
+                  <button class="btn" id="btn-zoom-fit" type="button" title="Fit canvas to default view">Fit</button>
+                </div>
               </div>
               <div id="canvas-stage" style="position: relative; display: inline-block;">
                 <canvas id="editor-canvas" width="900" height="900"></canvas>
@@ -319,139 +380,155 @@
             </details>
           </div>
 
-          <div class="support-grid">
-            <div class="panel">
-              <h2>Copy Sets</h2>
-              <div class="muted" style="margin-top:6px;">Generate headline + subhead + CTA sets and insert on canvas.</div>
-              <form method="post" action="/projects/{{ project.project_id }}/copy/sets">
-                <label>Brief</label>
-                <textarea name="brief_text" required placeholder="Product, offer, objective, constraints..."></textarea>
-                <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
-                  <input type="checkbox" name="use_images" value="true" />
-                  Use uploaded images as reference
-                </label>
-                <label>Count</label>
-                <input type="text" name="count" value="8" />
-                <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                <button class="btn btn-primary" type="submit" style="margin-top:10px;">Generate copy sets</button>
-              </form>
-              {% if copy_sets %}
-                <div style="margin-top:10px;">
-                  <form method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" onsubmit="return confirm('Clear all copy sets?');">
-                    <input type="hidden" name="clear_all" value="1" />
-                    <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                    <button class="btn btn-danger" type="submit">Clear all copy sets</button>
-                  </form>
+          <div class="rhs-overlays">
+            <details class="overlay-panel" id="overlay-copy">
+              <summary>
+                <div class="overlay-trigger">
+                  <span class="name">Copy Sets</span>
+                  <span class="meta">{% if copy_sets %}{{ copy_sets|length }}{% else %}0{% endif %}</span>
                 </div>
-                <div class="grid">
-                  {% for s in copy_sets %}
-                    <div class="item">
-                      <div class="muted" style="font-size:11px;">headline</div>
-                      <div style="margin-top:4px;">{{ s.headline }}</div>
-                      <div class="muted" style="font-size:11px; margin-top:8px;">subhead</div>
-                      <div style="margin-top:4px;">{{ s.subhead }}</div>
-                      <div class="muted" style="font-size:11px; margin-top:8px;">cta</div>
-                      <div style="margin-top:4px;">{{ s.cta }}</div>
-                      <div class="k">
-                        <button
-                          class="btn use-copy-set"
-                          type="button"
-                          data-headline="{{ s.headline|e }}"
-                          data-subhead="{{ s.subhead|e }}"
-                          data-cta="{{ s.cta|e }}"
-                        >
-                          Insert set
-                        </button>
-                        <button
-                          class="btn btn-danger"
-                          type="submit"
-                          form="copy-set-delete-{{ loop.index0 }}"
-                          onclick="return confirm('Delete this copy set?');"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <form id="copy-set-delete-{{ loop.index0 }}" method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" style="display:none;">
-                        <input type="hidden" name="indices" value="{{ loop.index0 }}" />
-                        <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                      </form>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% else %}
-                <div class="muted" style="margin-top:10px;">No copy sets yet.</div>
-              {% endif %}
-            </div>
-
-            <div class="panel">
-              <h2>Recent Previews</h2>
-              {% if text_previews %}
-                <div class="k" style="margin-bottom:8px;">
-                  <div class="muted">Preview assets</div>
-                  <label class="muted" style="display:flex; align-items:center; gap:6px;">
-                    <input type="checkbox" id="preview-select-all" />
-                    Select all
+              </summary>
+              <div class="overlay-body">
+                <div class="overlay-title">Copy Sets</div>
+                <div class="muted">Generate headline + subhead + CTA sets and insert on canvas.</div>
+                <form method="post" action="/projects/{{ project.project_id }}/copy/sets">
+                  <label>Brief</label>
+                  <textarea name="brief_text" required placeholder="Product, offer, objective, constraints..."></textarea>
+                  <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                    <input type="checkbox" name="use_images" value="true" />
+                    Use uploaded images as reference
                   </label>
-                </div>
-                <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete">
+                  <label>Count</label>
+                  <input type="text" name="count" value="8" />
                   <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
-                  <input type="hidden" name="asset_kind" value="text_preview" />
-                  <input type="hidden" name="image_size" value="2K" />
+                  <button class="btn btn-primary" type="submit" style="margin-top:10px;">Generate copy sets</button>
+                </form>
+                {% if copy_sets %}
+                  <div style="margin-top:10px;">
+                    <form method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" onsubmit="return confirm('Clear all copy sets?');">
+                      <input type="hidden" name="clear_all" value="1" />
+                      <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                      <button class="btn btn-danger" type="submit">Clear all copy sets</button>
+                    </form>
+                  </div>
                   <div class="grid">
-                    {% for a in text_previews[:9] %}
+                    {% for s in copy_sets %}
                       <div class="item">
-                        <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
-                      <div class="k">
-                        <small class="muted">{{ a.metadata.ratio }}</small>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                          <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                          {% if a.metadata.ratio_layout_id %}
-                            <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">open in editor</a>
-                            <button
-                              class="btn"
-                              type="submit"
-                              formmethod="post"
-                              formaction="/projects/{{ project.project_id }}/layouts/{{ a.metadata.ratio_layout_id }}/outpaint"
-                              name="image_size"
-                              value="2K"
-                            >
-                              Outpaint
-                            </button>
-                          {% endif %}
-                        </div>
-                      </div>
-                      {% if a.metadata.debug_text_layers %}
-                        <details style="margin-top:6px;">
-                          <summary class="muted">debug</summary>
-                          <pre style="white-space: pre-wrap; font-size: 11px; color: rgba(255,255,255,0.78);">{{ a.metadata.debug_text_layers | tojson }}</pre>
-                        </details>
-                      {% endif %}
+                        <div class="muted" style="font-size:11px;">headline</div>
+                        <div style="margin-top:4px;">{{ s.headline }}</div>
+                        <div class="muted" style="font-size:11px; margin-top:8px;">subhead</div>
+                        <div style="margin-top:4px;">{{ s.subhead }}</div>
+                        <div class="muted" style="font-size:11px; margin-top:8px;">cta</div>
+                        <div style="margin-top:4px;">{{ s.cta }}</div>
                         <div class="k">
-                          <label class="muted" style="display:flex; align-items:center; gap:6px;">
-                            <input type="checkbox" class="preview-select" name="asset_ids" value="{{ a.asset_id }}" />
-                            select
-                          </label>
+                          <button
+                            class="btn use-copy-set"
+                            type="button"
+                            data-headline="{{ s.headline|e }}"
+                            data-subhead="{{ s.subhead|e }}"
+                            data-cta="{{ s.cta|e }}"
+                          >
+                            Insert set
+                          </button>
                           <button
                             class="btn btn-danger"
                             type="submit"
-                            formaction="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete"
-                            formmethod="post"
-                            onclick="return confirm('Delete this preview?');"
+                            form="copy-set-delete-{{ loop.index0 }}"
+                            onclick="return confirm('Delete this copy set?');"
                           >
                             Delete
                           </button>
                         </div>
+                        <form id="copy-set-delete-{{ loop.index0 }}" method="post" action="/projects/{{ project.project_id }}/copy/sets/delete" style="display:none;">
+                          <input type="hidden" name="indices" value="{{ loop.index0 }}" />
+                          <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                        </form>
                       </div>
                     {% endfor %}
                   </div>
-                  <div class="k" style="margin-top:10px;">
-                    <button class="btn btn-danger" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
+                {% else %}
+                  <div class="muted" style="margin-top:10px;">No copy sets yet.</div>
+                {% endif %}
+              </div>
+            </details>
+
+            <details class="overlay-panel" id="overlay-previews">
+              <summary>
+                <div class="overlay-trigger">
+                  <span class="name">Recent Previews</span>
+                  <span class="meta">{% if text_previews %}{{ text_previews|length }}{% else %}0{% endif %}</span>
+                </div>
+              </summary>
+              <div class="overlay-body">
+                <div class="overlay-title">Recent Previews</div>
+                {% if text_previews %}
+                  <div class="k" style="margin-bottom:8px;">
+                    <div class="muted">Preview assets</div>
+                    <label class="muted" style="display:flex; align-items:center; gap:6px;">
+                      <input type="checkbox" id="preview-select-all" />
+                      Select all
+                    </label>
                   </div>
-                </form>
-              {% else %}
-                <div class="muted">No previews generated yet.</div>
-              {% endif %}
-            </div>
+                  <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete">
+                    <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
+                    <input type="hidden" name="asset_kind" value="text_preview" />
+                    <input type="hidden" name="image_size" value="2K" />
+                    <div class="grid">
+                      {% for a in text_previews[:9] %}
+                        <div class="item">
+                          <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
+                        <div class="k">
+                          <small class="muted">{{ a.metadata.ratio }}</small>
+                          <div style="display:flex; gap:8px; align-items:center;">
+                            <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                            {% if a.metadata.ratio_layout_id %}
+                              <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">open in editor</a>
+                              <button
+                                class="btn"
+                                type="submit"
+                                formmethod="post"
+                                formaction="/projects/{{ project.project_id }}/layouts/{{ a.metadata.ratio_layout_id }}/outpaint"
+                                name="image_size"
+                                value="2K"
+                              >
+                                Outpaint
+                              </button>
+                            {% endif %}
+                          </div>
+                        </div>
+                        {% if a.metadata.debug_text_layers %}
+                          <details style="margin-top:6px;">
+                            <summary class="muted">debug</summary>
+                            <pre style="white-space: pre-wrap; font-size: 11px; color: rgba(255,255,255,0.78);">{{ a.metadata.debug_text_layers | tojson }}</pre>
+                          </details>
+                        {% endif %}
+                          <div class="k">
+                            <label class="muted" style="display:flex; align-items:center; gap:6px;">
+                              <input type="checkbox" class="preview-select" name="asset_ids" value="{{ a.asset_id }}" />
+                              select
+                            </label>
+                            <button
+                              class="btn btn-danger"
+                              type="submit"
+                              formaction="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete"
+                              formmethod="post"
+                              onclick="return confirm('Delete this preview?');"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                    <div class="k" style="margin-top:10px;">
+                      <button class="btn btn-danger" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
+                    </div>
+                  </form>
+                {% else %}
+                  <div class="muted">No previews generated yet.</div>
+                {% endif %}
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -467,6 +544,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=28"></script>
+    <script src="/static/editor.js?v=30"></script>
   </body>
 </html>

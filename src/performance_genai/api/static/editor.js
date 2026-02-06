@@ -78,6 +78,10 @@
   var loadingOverlay = document.getElementById("loading-overlay");
   var canvasWrap = document.getElementById("canvas-wrap");
   var btnCenterGuide = document.getElementById("btn-center-guide");
+  var btnZoomIn = document.getElementById("btn-zoom-in");
+  var btnZoomOut = document.getElementById("btn-zoom-out");
+  var btnZoomFit = document.getElementById("btn-zoom-fit");
+  var zoomReadout = document.getElementById("zoom-readout");
 
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
@@ -126,6 +130,9 @@
   var guideRatio = (guideSelect && guideSelect.value) || "1:1";
   var guideBounds = null;
   var guideRect = null;
+  var deadzoneRects = [];
+  var deadzonePatternSource = null;
+  var zoomLevel = 1;
 
   var defaultTextBox = { x: 0.08, y: 0.62, w: 0.80, h: 0.14 };
   var defaultCopyBoxes = [
@@ -146,6 +153,9 @@
   var panStartY = 0;
   var panStartLeft = 0;
   var panStartTop = 0;
+  var panStartViewportX = 0;
+  var panStartViewportY = 0;
+  var panMode = "scroll";
 
   function showLoader() {
     if (loadingOverlay) {
@@ -255,7 +265,7 @@
       if (rect) canvas.remove(rect);
       return;
     }
-    var box = obj.getBoundingRect(true);
+    var box = getObjectRect(obj);
     var padInfo = getTextBgPadding(obj);
     obj.pg_bg_pad = padInfo.pad;
     obj.pg_bg_pad_base_width = padInfo.baseWidth;
@@ -299,8 +309,7 @@
     } else {
       canvas.sendToBack(rect);
     }
-    if (bgObj) canvas.sendToBack(bgObj);
-    if (guideRect) canvas.bringToFront(guideRect);
+    syncCanvasOrder();
   }
 
   function applyTextBackgroundToSelection() {
@@ -365,9 +374,162 @@
     return { left: 0, top: 0, width: canvasSize.w, height: canvasSize.h };
   }
 
+  function getObjectRect(obj) {
+    if (!obj) return { left: 0, top: 0, width: 0, height: 0 };
+    var width = obj.getScaledWidth ? obj.getScaledWidth() : ((obj.width || 0) * (obj.scaleX || 1));
+    var height = obj.getScaledHeight ? obj.getScaledHeight() : ((obj.height || 0) * (obj.scaleY || 1));
+    var left = obj.left || 0;
+    var top = obj.top || 0;
+    return {
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+    };
+  }
+
+  function getDeadzonePattern() {
+    if (!deadzonePatternSource) {
+      deadzonePatternSource = document.createElement("canvas");
+      deadzonePatternSource.width = 14;
+      deadzonePatternSource.height = 14;
+      var ctx = deadzonePatternSource.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "rgba(8,10,14,0.42)";
+        ctx.fillRect(0, 0, 14, 14);
+        ctx.fillStyle = "rgba(255,255,255,0.16)";
+        ctx.beginPath();
+        ctx.arc(3.5, 3.5, 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(10.5, 10.5, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    return new fabric.Pattern({
+      source: deadzonePatternSource,
+      repeat: "repeat",
+    });
+  }
+
+  function ensureDeadzoneRects() {
+    if (deadzoneRects.length === 4) return;
+    while (deadzoneRects.length < 4) {
+      var rect = new fabric.Rect({
+        left: 0,
+        top: 0,
+        width: 0,
+        height: 0,
+        fill: getDeadzonePattern(),
+        selectable: false,
+        evented: false,
+        hoverCursor: "default",
+        excludeFromExport: true,
+      });
+      rect.pg_is_deadzone = true;
+      deadzoneRects.push(rect);
+      canvas.add(rect);
+    }
+  }
+
+  function updateDeadzoneOverlay(bounds) {
+    ensureDeadzoneRects();
+    var fullW = canvasSize.w;
+    var fullH = canvasSize.h;
+    var zones = [
+      { left: 0, top: 0, width: fullW, height: Math.max(0, bounds.top) },
+      { left: 0, top: bounds.top, width: Math.max(0, bounds.left), height: bounds.height },
+      { left: bounds.left + bounds.width, top: bounds.top, width: Math.max(0, fullW - (bounds.left + bounds.width)), height: bounds.height },
+      { left: 0, top: bounds.top + bounds.height, width: fullW, height: Math.max(0, fullH - (bounds.top + bounds.height)) },
+    ];
+    for (var i = 0; i < deadzoneRects.length; i++) {
+      var rect = deadzoneRects[i];
+      var zone = zones[i];
+      rect.set({
+        left: zone.left,
+        top: zone.top,
+        width: Math.max(0, zone.width),
+        height: Math.max(0, zone.height),
+        visible: zone.width > 0 && zone.height > 0,
+      });
+      rect.setCoords();
+    }
+  }
+
+  function syncCanvasOrder() {
+    if (bgObj) {
+      canvas.sendToBack(bgObj);
+    }
+    ensureDeadzoneRects();
+    var start = bgObj ? 1 : 0;
+    for (var i = 0; i < deadzoneRects.length; i++) {
+      var rect = deadzoneRects[i];
+      if (canvas.getObjects().indexOf(rect) === -1) {
+        canvas.add(rect);
+      }
+      canvas.moveTo(rect, start + i);
+    }
+    if (guideRect) {
+      canvas.bringToFront(guideRect);
+    }
+  }
+
+  function updateZoomReadout() {
+    if (!zoomReadout) return;
+    zoomReadout.textContent = Math.round(zoomLevel * 100) + "%";
+  }
+
+  function clampViewport() {
+    var vpt = canvas.viewportTransform;
+    if (!vpt || vpt.length < 6) return;
+    var zoom = vpt[0] || 1;
+    var scaledW = canvasSize.w * zoom;
+    var scaledH = canvasSize.h * zoom;
+    if (zoom <= 1) {
+      vpt[4] = (canvasSize.w - scaledW) / 2;
+      vpt[5] = (canvasSize.h - scaledH) / 2;
+    } else {
+      var minX = canvasSize.w - scaledW;
+      var minY = canvasSize.h - scaledH;
+      if (vpt[4] < minX) vpt[4] = minX;
+      if (vpt[4] > 0) vpt[4] = 0;
+      if (vpt[5] < minY) vpt[5] = minY;
+      if (vpt[5] > 0) vpt[5] = 0;
+    }
+    canvas.setViewportTransform(vpt);
+  }
+
+  function applyZoom(next) {
+    var target = Math.max(0.4, Math.min(2.5, next));
+    var center = new fabric.Point(canvasSize.w / 2, canvasSize.h / 2);
+    canvas.zoomToPoint(center, target);
+    zoomLevel = target;
+    clampViewport();
+    canvas.requestRenderAll();
+    updateZoomReadout();
+  }
+
+  function fitToScreen() {
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    zoomLevel = 1;
+    clampViewport();
+    canvas.requestRenderAll();
+    updateZoomReadout();
+    centerGuideInViewport();
+  }
+
   function centerGuideInViewport() {
-    if (!canvasWrap) return;
     var guide = getGuideBounds();
+    var zoom = canvas.getZoom ? canvas.getZoom() : 1;
+    if (zoom > 1.001) {
+      var vpt = canvas.viewportTransform || [zoom, 0, 0, zoom, 0, 0];
+      vpt[4] = (canvasSize.w / 2) - ((guide.left + (guide.width / 2)) * zoom);
+      vpt[5] = (canvasSize.h / 2) - ((guide.top + (guide.height / 2)) * zoom);
+      canvas.setViewportTransform(vpt);
+      clampViewport();
+      canvas.requestRenderAll();
+    }
+    if (!canvasWrap) return;
     var targetLeft = (guide.left + (guide.width / 2)) - (canvasWrap.clientWidth / 2);
     var targetTop = (guide.top + (guide.height / 2)) - (canvasWrap.clientHeight / 2);
     canvasWrap.scrollLeft = Math.max(0, Math.round(targetLeft));
@@ -383,6 +545,7 @@
     canvas.defaultCursor = "default";
     canvas.skipTargetFind = false;
     canvas.selection = true;
+    panMode = "scroll";
   }
 
   function normalizeObjectScale(obj) {
@@ -598,6 +761,7 @@
       img.pg_src = url;
       ensureObjectId(img);
       canvas.add(img);
+      syncCanvasOrder();
       canvas.setActiveObject(img);
       canvas.renderAll();
       saveState();
@@ -653,8 +817,7 @@
     obj.pg_shape_opacity = opacity;
     ensureObjectId(obj);
     canvas.add(obj);
-    if (bgObj) canvas.sendToBack(bgObj);
-    if (guideRect) canvas.bringToFront(guideRect);
+    syncCanvasOrder();
     canvas.setActiveObject(obj);
     canvas.renderAll();
     saveState();
@@ -679,6 +842,7 @@
         hoverCursor: "default",
         excludeFromExport: true,
       });
+      guideRect.pg_is_guide = true;
       canvas.add(guideRect);
     } else {
       guideRect.set({
@@ -688,7 +852,8 @@
         height: bounds.height,
       });
     }
-    canvas.bringToFront(guideRect);
+    updateDeadzoneOverlay(bounds);
+    syncCanvasOrder();
   }
 
   function snapshotNow() {
@@ -701,11 +866,18 @@
       "pg_kv_id",
       "pg_is_text_bg",
       "pg_bg_for",
+      "pg_is_guide",
+      "pg_is_deadzone",
       "pg_is_shape",
       "pg_shape_type",
       "pg_shape_color",
       "pg_shape_opacity",
     ]);
+    if (json && Array.isArray(json.objects)) {
+      json.objects = json.objects.filter(function (obj) {
+        return !(obj && (obj.pg_is_guide || obj.pg_is_deadzone));
+      });
+    }
     var serialized = "";
     try {
       serialized = JSON.stringify(json);
@@ -754,10 +926,9 @@
           };
         }
       });
-      if (guideRect) {
-        canvas.add(guideRect);
-        canvas.bringToFront(guideRect);
-      }
+      updateGuideRect(getGuideBounds());
+      syncCanvasOrder();
+      clampViewport();
       canvas.renderAll();
       historyLock = false;
       saveState();
@@ -821,7 +992,7 @@
       var dy = nextOffset.y - currentOffset.y;
       if (dx || dy) {
         canvas.getObjects().forEach(function (obj) {
-          if (!obj || obj === guideRect || obj.pg_is_background) return;
+          if (!obj || obj === guideRect || obj.pg_is_background || obj.pg_is_deadzone) return;
           obj.set({ left: obj.left + dx, top: obj.top + dy });
         });
       }
@@ -835,6 +1006,7 @@
     }
 
     updateGuideRect(nextGuide);
+    clampViewport();
     currentOffset = nextOffset;
     canvas.renderAll();
     updateRatioLabel();
@@ -883,10 +1055,10 @@
       ensureObjectId(img);
       bgObj = img;
       canvas.add(img);
-      canvas.sendToBack(img);
       updateGuideRect(getGuideBounds());
       restoreElements(state);
       restoreShapes(state);
+      syncCanvasOrder();
       label.textContent = kv.label || kv.id;
       log("Canvas size: " + canvas.getWidth() + "x" + canvas.getHeight());
       canvas.renderAll();
@@ -907,7 +1079,7 @@
 
   function normBox(obj) {
     if (!obj) return { x: 0, y: 0, w: 0, h: 0 };
-    var rect = obj.getBoundingRect(true);
+    var rect = getObjectRect(obj);
     var base = getGuideBounds();
     return {
       x: clamp01((rect.left - base.left) / base.width),
@@ -928,7 +1100,7 @@
     var base = getGuideBounds();
     for (var i = 0; i < objs.length; i++) {
       var obj = objs[i];
-      var rect = obj.getBoundingRect(true);
+      var rect = getObjectRect(obj);
       var wrapped = obj.text || "";
       if (obj._textLines && obj._textLines.length) {
         wrapped = obj._textLines.map(function (line) {
@@ -972,7 +1144,7 @@
     var objs = getElementObjects();
     for (var i = 0; i < objs.length; i++) {
       var obj = objs[i];
-      var rect = obj.getBoundingRect(true);
+      var rect = getObjectRect(obj);
       elements.push({
         asset_id: obj.pg_asset_id || "",
         src: obj.pg_src || "",
@@ -994,7 +1166,7 @@
     var objs = getShapeObjects();
     for (var i = 0; i < objs.length; i++) {
       var obj = objs[i];
-      var rect = obj.getBoundingRect(true);
+      var rect = getObjectRect(obj);
       shapes.push({
         shape: obj.pg_shape_type || obj.type || "rect",
         box: {
@@ -1075,7 +1247,7 @@
     }
     var bg = getBackgroundObject();
     if (bg) {
-      var rect = bg.getBoundingRect(true);
+      var rect = getObjectRect(bg);
       return {
         x: (rect.left - base.left) / base.width,
         y: (rect.top - base.top) / base.height,
@@ -1170,7 +1342,7 @@
   function updateLayerPanel() {
     if (!layerPanel) return;
     var objs = canvas.getObjects().filter(function (obj) {
-      return obj && obj !== guideRect && !obj.pg_is_text_bg;
+      return obj && obj !== guideRect && !obj.pg_is_text_bg && !obj.pg_is_deadzone && !obj.pg_is_guide;
     });
     layerPanel.innerHTML = "";
     if (!objs.length) {
@@ -1241,7 +1413,7 @@
         });
         if (target) {
           canvas.bringForward(target);
-          if (guideRect) canvas.bringToFront(guideRect);
+          syncCanvasOrder();
           canvas.renderAll();
           saveState();
           updateLayerPanel();
@@ -1255,7 +1427,7 @@
         });
         if (target) {
           canvas.sendBackwards(target);
-          if (guideRect) canvas.bringToFront(guideRect);
+          syncCanvasOrder();
           canvas.renderAll();
           saveState();
           updateLayerPanel();
@@ -1283,8 +1455,8 @@
     normalizeObjectScale(e.target);
     if (e.target && e.target.pg_is_background) {
       currentOffset = { x: e.target.left || 0, y: e.target.top || 0 };
-      if (guideRect) canvas.bringToFront(guideRect);
     }
+    syncCanvasOrder();
     if (e.target && e.target.type === "textbox") {
       syncControlsFromSelection(e.target);
     }
@@ -1306,13 +1478,13 @@
     queueSnapshot();
   });
   canvas.on("object:added", function (e) {
-    if (e.target && e.target !== guideRect) {
+    if (e.target && e.target !== guideRect && !e.target.pg_is_deadzone && !e.target.pg_is_guide) {
       ensureObjectId(e.target);
       updateLayerPanel();
     }
   });
   canvas.on("object:removed", function (e) {
-    if (e.target && e.target !== guideRect) {
+    if (e.target && e.target !== guideRect && !e.target.pg_is_deadzone && !e.target.pg_is_guide) {
       if (e.target.type === "textbox") {
         removeTextBackground(e.target);
       }
@@ -1506,8 +1678,8 @@
       canvas.renderAll();
       if (obj.pg_is_background) {
         currentOffset = { x: obj.left || 0, y: obj.top || 0 };
-        if (guideRect) canvas.bringToFront(guideRect);
       }
+      syncCanvasOrder();
       saveState();
       snapshotNow();
       e.preventDefault();
@@ -1529,6 +1701,10 @@
       panStartY = e.clientY;
       panStartLeft = canvasWrap.scrollLeft;
       panStartTop = canvasWrap.scrollTop;
+      panMode = zoomLevel > 1.001 ? "viewport" : "scroll";
+      var vpt = canvas.viewportTransform || [zoomLevel, 0, 0, zoomLevel, 0, 0];
+      panStartViewportX = vpt[4] || 0;
+      panStartViewportY = vpt[5] || 0;
       canvas.defaultCursor = "grabbing";
       canvas.skipTargetFind = true;
       canvas.selection = false;
@@ -1539,8 +1715,17 @@
     if (!isPanDragging || !canvasWrap) return;
     var dx = e.clientX - panStartX;
     var dy = e.clientY - panStartY;
-    canvasWrap.scrollLeft = panStartLeft - dx;
-    canvasWrap.scrollTop = panStartTop - dy;
+    if (panMode === "viewport") {
+      var vpt = canvas.viewportTransform || [zoomLevel, 0, 0, zoomLevel, 0, 0];
+      vpt[4] = panStartViewportX + dx;
+      vpt[5] = panStartViewportY + dy;
+      canvas.setViewportTransform(vpt);
+      clampViewport();
+      canvas.requestRenderAll();
+    } else {
+      canvasWrap.scrollLeft = panStartLeft - dx;
+      canvasWrap.scrollTop = panStartTop - dy;
+    }
   });
   window.addEventListener("mouseup", function () {
     finishPan();
@@ -1548,6 +1733,21 @@
   if (btnCenterGuide) {
     btnCenterGuide.addEventListener("click", function () {
       centerGuideInViewport();
+    });
+  }
+  if (btnZoomIn) {
+    btnZoomIn.addEventListener("click", function () {
+      applyZoom(zoomLevel + 0.1);
+    });
+  }
+  if (btnZoomOut) {
+    btnZoomOut.addEventListener("click", function () {
+      applyZoom(zoomLevel - 0.1);
+    });
+  }
+  if (btnZoomFit) {
+    btnZoomFit.addEventListener("click", function () {
+      fitToScreen();
     });
   }
   if (fontScaleInput) {
@@ -1625,6 +1825,7 @@
           cloned.pg_bg_radius_base_width = obj.pg_bg_radius_base_width;
         }
         canvas.add(cloned);
+        syncCanvasOrder();
         canvas.setActiveObject(cloned);
         if (cloned.type === "textbox") {
           updateTextBackground(cloned);
@@ -1640,7 +1841,7 @@
       var obj = getActiveObject();
       if (!obj) return;
       canvas.bringForward(obj);
-      if (guideRect) canvas.bringToFront(guideRect);
+      syncCanvasOrder();
       canvas.renderAll();
       saveState();
       snapshotNow();
@@ -1651,7 +1852,7 @@
       var obj = getActiveObject();
       if (!obj) return;
       canvas.sendBackwards(obj);
-      if (guideRect) canvas.bringToFront(guideRect);
+      syncCanvasOrder();
       canvas.renderAll();
       saveState();
       snapshotNow();
@@ -1682,6 +1883,8 @@
       applyCopySet(btn.dataset.headline, btn.dataset.subhead, btn.dataset.cta);
     });
   }
+
+  updateZoomReadout();
 
   var saved = loadState();
   if (layoutData && layoutData.kv_asset_id && kvMap[layoutData.kv_asset_id]) {
