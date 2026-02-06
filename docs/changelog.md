@@ -189,3 +189,4 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html + src/performance_genai/api/static/editor.js > topbar/canvas-wrap/applyGuide pad > make top header slimmer+sticky, hide canvas viewport scrollbars, and tighten workspace bleed around the guide to reduce wasted scroll area**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > rhs-overlays top offset > move Copy Sets/Recent Previews overlay stack lower to avoid overlap with canvas zoom/fit controls**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > rhs-overlays top offset > move Copy Sets/Recent Previews overlay stack down by an additional 100px for responsive-height overlap cases**
+- **2026-02-06 > src/performance_genai/api/templates/project.html > Visual Pool actions/topbar labels > remove shortlist/remove/delete per-card actions and the Shortlisted panel to simplify card layout and prevent action overflow**

@@ -81,7 +81,6 @@
         <div class="row" style="align-items:center;">
           <span class="pill">refs: {{ (assets | selectattr('kind','equalto','reference') | list | length) }}</span>
           <span class="pill">visuals: {{ base_kvs|length }}</span>
-          <span class="pill">shortlisted: {{ shortlisted_kvs|length }}</span>
           <a class="btn btn-primary" href="/projects/{{ project.project_id }}/editor">Open editor</a>
           <form method="post" action="/projects/{{ project.project_id }}/delete" onsubmit="return confirm('Delete this project and all its assets?');">
             <button class="btn btn-danger" type="submit">Delete ad set</button>
@@ -128,7 +127,7 @@
 
           <div class="panel">
             <h2>Generate Visual Pool</h2>
-            <div class="muted">Create a small set of base visuals (max 5) to shortlist.</div>
+            <div class="muted">Create a small set of base visuals (max 5).</div>
             <form method="post" action="/projects/{{ project.project_id }}/kvs/generate">
               <label>Prompt</label>
               <textarea name="prompt" required placeholder="e.g., lifestyle scene..."></textarea>
@@ -232,51 +231,12 @@
                     </div>
                     <div class="k">
                       <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                      {% if a.metadata.get('shortlisted') %}
-                        <small class="pill">shortlisted</small>
-                      {% endif %}
-                      <form method="post" action="/projects/{{ project.project_id }}/kvs/{{ a.asset_id }}/shortlist">
-                        <input type="hidden" name="shortlisted" value="{% if a.metadata.get('shortlisted') %}0{% else %}1{% endif %}" />
-                        <button class="btn {% if not a.metadata.get('shortlisted') %}btn-primary{% endif %}" type="submit">{% if a.metadata.get('shortlisted') %}Remove{% else %}Shortlist{% endif %}</button>
-                      </form>
-                      <form method="post" action="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete" onsubmit="return confirm('Delete this KV?');">
-                        <button class="btn btn-danger" type="submit">Delete</button>
-                      </form>
                     </div>
                   </div>
                 {% endfor %}
               </div>
             {% else %}
               <p class="muted">No visuals yet.</p>
-            {% endif %}
-          </div>
-
-          <div class="panel">
-            <h2>Shortlisted</h2>
-            {% if shortlisted_kvs %}
-              <div class="grid">
-                {% for a in shortlisted_kvs %}
-                  <div class="item">
-                    <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
-                    <div class="k">
-                      <small>kv</small>
-                      <small><code>{{ a.asset_id }}</code></small>
-                    </div>
-                    <div class="k">
-                      <small class="muted">{{ a.metadata.get('display_name', a.filename) }}</small>
-                    </div>
-                    <div class="k">
-                      <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
-                      <form method="post" action="/projects/{{ project.project_id }}/kvs/{{ a.asset_id }}/shortlist">
-                        <input type="hidden" name="shortlisted" value="0" />
-                        <button class="btn" type="submit">Remove</button>
-                      </form>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <p class="muted">No shortlisted visuals yet.</p>
             {% endif %}
           </div>
         </div>
