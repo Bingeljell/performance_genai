@@ -493,7 +493,7 @@ async def outpaint_layout(
         },
     )
 
-    return RedirectResponse(url=f"/projects/{project_id}/editor", status_code=303)
+    return RedirectResponse(url=f"/projects/{project_id}/editor?layout_id={new_layout_id}", status_code=303)
 
 @app.post("/projects/{project_id}/delete")
 def delete_project(project_id: str):

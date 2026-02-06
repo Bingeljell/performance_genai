@@ -81,7 +81,7 @@
       }
       .overlay-panel[open] > summary {
         border-color: rgba(255,255,255,0.60);
-        background: linear-gradient(160deg, rgba(245,243,238,0.50), rgba(245,243,238,0.28));
+        background: rgba(14, 17, 22, 0.96);
       }
       .overlay-panel > summary::-webkit-details-marker { display: none; }
       .overlay-trigger {
@@ -110,7 +110,17 @@
         min-width: 26px;
         text-align: center;
       }
-      .overlay-panel .overlay-body { margin-top: 8px; width: min(430px, 38vw); max-height: calc(100vh - 170px); overflow: auto; border: 1px solid var(--stroke); border-radius: 14px; background: var(--panel2); padding: 14px; box-shadow: 0 12px 28px var(--shadow); }
+      .overlay-panel .overlay-body {
+        margin-top: 8px;
+        width: min(430px, 38vw);
+        max-height: calc(100vh - 170px);
+        overflow: auto;
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 14px;
+        background: rgba(14, 17, 22, 0.97);
+        padding: 14px;
+        box-shadow: 0 12px 28px var(--shadow);
+      }
       .overlay-title { font-size: 14px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86); margin-bottom: 6px; }
       @media (max-width: 1200px) {
         .rhs-overlays { position: static; align-items: stretch; }
@@ -150,10 +160,39 @@
       #overlay-previews .k label { font-size: 10px; }
       #overlay-previews .muted { font-size: 10px; }
       #overlay-previews .overlay-actions { display:flex; align-items:center; gap:6px; flex-wrap: wrap; }
+      #overlay-previews .preview-actions { display:flex; gap:4px; align-items:center; flex-wrap: wrap; }
+      #overlay-previews .preview-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 22px;
+        padding: 3px 6px;
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 8px;
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.92);
+        text-decoration: none;
+        font-size: 10px;
+      }
+      #overlay-previews .preview-link:hover { background: rgba(255,255,255,0.12); }
+      #overlay-previews .ratio-pill {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-height:22px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.18);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.9);
+        font-size: 10px;
+      }
       body.preview-density-comfy #overlay-previews .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
       body.preview-density-comfy #overlay-previews .item { padding: 9px; border-radius: 12px; }
       body.preview-density-comfy #overlay-previews .thumb { max-height: 130px; border-radius: 10px; }
       body.preview-density-comfy #overlay-previews .k .btn { font-size: 11px; padding: 5px 8px; }
+      body.preview-density-comfy #overlay-previews .preview-link { font-size: 11px; padding: 4px 8px; min-height: 24px; }
+      body.preview-density-comfy #overlay-previews .ratio-pill { font-size: 11px; min-height: 24px; }
       body.preview-density-comfy #overlay-previews .k a,
       body.preview-density-comfy #overlay-previews .k small,
       body.preview-density-comfy #overlay-previews .k label,
@@ -382,6 +421,12 @@
                 <span class="muted" id="kv-label">No visual selected</span>
                 <span class="muted" id="ratio-label"></span>
                 <button class="btn" id="btn-center-guide" type="button">Center guide</button>
+                {% if editor_layout and editor_layout.layout_id and (editor_layout.layout_kind == "ratio" or editor_layout.layout_kind == "ratio_outpaint") %}
+                  <form method="post" action="/projects/{{ project.project_id }}/layouts/{{ editor_layout.layout_id }}/outpaint" style="display:inline-flex; gap:6px; align-items:center;">
+                    <input type="hidden" name="image_size" value="2K" />
+                    <button class="btn" type="submit">Outpaint</button>
+                  </form>
+                {% endif %}
                 <div class="zoom-controls">
                   <button class="btn btn-icon" id="btn-zoom-out" type="button" title="Zoom out">-</button>
                   <span class="zoom-readout" id="zoom-readout">100%</span>
@@ -494,56 +539,30 @@
                   <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete">
                     <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
                     <input type="hidden" name="asset_kind" value="text_preview" />
-                    <input type="hidden" name="image_size" value="2K" />
+                    <div class="k" style="margin-top:0; margin-bottom:8px;">
+                      <button class="btn btn-danger" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
+                    </div>
                     <div class="grid">
                       {% for a in text_previews[:9] %}
                         <div class="item">
                           <img class="thumb" src="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" />
                         <div class="k">
-                          <small class="muted">{{ a.metadata.ratio }}</small>
-                          <div style="display:flex; gap:8px; align-items:center;">
-                            <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">Open</a>
+                          <span class="ratio-pill">{{ a.metadata.ratio }}</span>
+                          <div class="preview-actions">
+                            <a class="preview-link" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">Open</a>
                             {% if a.metadata.ratio_layout_id %}
-                              <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">Editor</a>
-                              <button
-                                class="btn"
-                                type="submit"
-                                formmethod="post"
-                                formaction="/projects/{{ project.project_id }}/layouts/{{ a.metadata.ratio_layout_id }}/outpaint"
-                                name="image_size"
-                                value="2K"
-                              >
-                                Outpaint
-                              </button>
+                              <a class="preview-link" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">Editor</a>
                             {% endif %}
                           </div>
                         </div>
-                        {% if a.metadata.debug_text_layers %}
-                          <details style="margin-top:6px;">
-                            <summary class="muted">debug</summary>
-                            <pre style="white-space: pre-wrap; font-size: 11px; color: rgba(255,255,255,0.78);">{{ a.metadata.debug_text_layers | tojson }}</pre>
-                          </details>
-                        {% endif %}
-                          <div class="k">
-                            <label class="muted" style="display:flex; align-items:center; gap:6px;">
-                              <input type="checkbox" class="preview-select" name="asset_ids" value="{{ a.asset_id }}" />
-                              select
-                            </label>
-                            <button
-                              class="btn btn-danger"
-                              type="submit"
-                              formaction="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}/delete"
-                              formmethod="post"
-                              onclick="return confirm('Delete this preview?');"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                        <div class="k">
+                          <label class="muted" style="display:flex; align-items:center; gap:6px;">
+                            <input type="checkbox" class="preview-select" name="asset_ids" value="{{ a.asset_id }}" />
+                            Select
+                          </label>
+                        </div>
                         </div>
                       {% endfor %}
-                    </div>
-                    <div class="k" style="margin-top:10px;">
-                      <button class="btn btn-danger" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
                     </div>
                   </form>
                 {% else %}
@@ -566,6 +585,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=31"></script>
+    <script src="/static/editor.js?v=32"></script>
   </body>
 </html>

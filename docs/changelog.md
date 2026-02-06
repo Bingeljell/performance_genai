@@ -170,3 +170,6 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > increase RHS overlay trigger opacity/contrast for readability and reduce Recent Previews thumbnail/card footprint for lower vertical scroll**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add compact/comfy density toggle UI in Recent Previews and shrink preview card typography/button sizing for compact mode**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > applyPreviewDensity/loadPreviewDensity/savePreviewDensity > persist and apply Recent Previews density mode per project**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > raise open-overlay opacity (>=95%), simplify Recent Previews cards (Open + Editor + Select), and remove per-card outpaint/debug/delete controls**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add outpaint button to canvas toolbar when editing a ratio layout**
+- **2026-02-06 > src/performance_genai/api/app.py > outpaint_layout > redirect to newly created outpainted layout in editor using layout_id query param**
