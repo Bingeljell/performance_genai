@@ -67,7 +67,7 @@
       .btn-icon { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
       .layout {
         display:grid;
-        grid-template-columns: 340px minmax(0, 1fr);
+        grid-template-columns: minmax(280px, 300px) minmax(0, 1fr);
         gap: 14px;
         min-height: 0;
         flex: 1;
@@ -80,7 +80,7 @@
       }
       .canvas-column { display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 0; }
       .panel { border: 1px solid var(--stroke); border-radius: 14px; padding: 14px; background: var(--panel2); box-shadow: 0 10px 24px var(--shadow); }
-      .controls-panel { height: 100%; overflow: auto; }
+      .controls-panel { height: 100%; overflow-y: auto; overflow-x: visible; }
       .canvas-panel { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
       form { max-width: 100%; }
       .panel h2 { font-size: 14px; margin: 0 0 10px; letter-spacing: 0.3px; text-transform: uppercase; color: rgba(255,255,255,0.86); }
@@ -189,9 +189,19 @@
       }
       .field-row { display:flex; gap: 8px; align-items: center; }
       .asset-menu { position: relative; }
-      .asset-menu-content { display: none; position: absolute; top: 44px; left: 0; width: 360px; z-index: 60; background: rgba(16, 19, 26, 0.98); }
+      .asset-menu-content {
+        display: none;
+        position: absolute;
+        top: 44px;
+        left: 0;
+        width: min(320px, calc(100vw - 36px));
+        max-height: min(68vh, 560px);
+        overflow: auto;
+        z-index: 130;
+        background: rgba(16, 19, 26, 0.98);
+      }
       .asset-menu[open] .asset-menu-content { display: block; }
-      .asset-menu-content .grid { max-height: 320px; overflow: auto; }
+      .asset-menu-content .grid { max-height: none; overflow: visible; }
       .color-summary { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
       .color-summary:hover { background: rgba(255,255,255,0.12); }
       .color-swatch { width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; background: #ffffff; }

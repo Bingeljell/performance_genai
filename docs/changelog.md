@@ -193,3 +193,4 @@
 - **2026-02-06 > src/performance_genai/api/app.py > project_page/shortlist_kv/reframe_kv_batch > remove shortlist context and fully remove shortlist + batch-reframe endpoints to match current editor-first flow**
 - **2026-02-06 > src/performance_genai/storage.py > FileStorage > remove unused update_asset_metadata helper after shortlist flow removal**
 - **2026-02-06 > docs/implementation_poa.md + docs/implementation_progress.md > phase/workflow bullets > replace shortlist/batch-ratio language with direct editor-first base-visual flow**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > layout/controls-panel/asset-menu-content styles > narrow left control rail and make Add Asset/shape/text background menus self-scrolling overlays so they do not create horizontal scroll in the main controls panel**
