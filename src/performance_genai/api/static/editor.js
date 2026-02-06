@@ -1040,7 +1040,8 @@
     var ratio = parseRatio(guideRatio) || { w: 1, h: 1 };
     var guideW = imageSize.w;
     var guideH = Math.round(guideW * ratio.h / ratio.w);
-    var pad = Math.round(Math.max(40, Math.min(200, guideW * 0.12)));
+    // Keep a small pasteboard around the guide so the canvas stays tight and avoids viewport scrolling.
+    var pad = Math.round(Math.max(8, Math.min(28, guideW * 0.03)));
     var canvasW = Math.max(imageSize.w, guideW) + pad * 2;
     if (canvasWrap) {
       var stageChromeX = 22;
