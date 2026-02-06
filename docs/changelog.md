@@ -173,3 +173,4 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > raise open-overlay opacity (>=95%), simplify Recent Previews cards (Open + Editor + Select), and remove per-card outpaint/debug/delete controls**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add outpaint button to canvas toolbar when editing a ratio layout**
 - **2026-02-06 > src/performance_genai/api/app.py > outpaint_layout > redirect to newly created outpainted layout in editor using layout_id query param**
+- **2026-02-06 > src/performance_genai/api/static/editor.js > applyGuide/reflowWorkspaceToViewport > make workspace fill available viewport width to the right of controls and reflow on window resize**

@@ -158,6 +158,7 @@
   var panStartViewportX = 0;
   var panStartViewportY = 0;
   var panMode = "scroll";
+  var resizeTimer = null;
 
   function showLoader() {
     if (loadingOverlay) {
@@ -950,6 +951,19 @@
     var guideH = Math.round(guideW * ratio.h / ratio.w);
     var pad = Math.round(Math.max(40, Math.min(200, guideW * 0.12)));
     var canvasW = Math.max(imageSize.w, guideW) + pad * 2;
+    if (canvasWrap) {
+      var stageChromeX = 22;
+      if (stageEl && window.getComputedStyle) {
+        var st = window.getComputedStyle(stageEl);
+        var pL = parseFloat(st.paddingLeft || "0") || 0;
+        var pR = parseFloat(st.paddingRight || "0") || 0;
+        var bL = parseFloat(st.borderLeftWidth || "0") || 0;
+        var bR = parseFloat(st.borderRightWidth || "0") || 0;
+        stageChromeX = pL + pR + bL + bR;
+      }
+      var viewportMinW = Math.max(320, Math.floor(canvasWrap.clientWidth - stageChromeX));
+      canvasW = Math.max(canvasW, viewportMinW);
+    }
     var canvasH = Math.max(imageSize.h, guideH) + pad * 2;
     var nextOffset = {
       x: Math.round((canvasW - imageSize.w) / 2),
@@ -1013,6 +1027,13 @@
     canvas.renderAll();
     updateRatioLabel();
     centerGuideInViewport();
+  }
+
+  function reflowWorkspaceToViewport() {
+    if (!bgObj) return;
+    var state = { image_box: collectImageBox() };
+    applyGuide(state, { preserveText: true });
+    saveState();
   }
 
   function setBackground(kv, state) {
@@ -1758,6 +1779,12 @@
   });
   window.addEventListener("mouseup", function () {
     finishPan();
+  });
+  window.addEventListener("resize", function () {
+    if (resizeTimer) window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(function () {
+      reflowWorkspaceToViewport();
+    }, 120);
   });
   if (btnCenterGuide) {
     btnCenterGuide.addEventListener("click", function () {
