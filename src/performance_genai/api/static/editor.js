@@ -93,6 +93,7 @@
   var textBgHex = document.getElementById("text-bg-hex");
   var textBgOpacity = document.getElementById("text-bg-opacity");
   var textBgRadius = document.getElementById("text-bg-radius");
+  var textBgRadiusValue = document.getElementById("text-bg-radius-value");
   var shapeColor = document.getElementById("shape-color");
   var shapeHex = document.getElementById("shape-hex");
   var shapeOpacity = document.getElementById("shape-opacity");
@@ -125,6 +126,14 @@
   if (colorSwatch && colorInput) {
     colorSwatch.style.background = colorInput.value || "#ffffff";
   }
+
+  function updateTextBgRadiusReadout() {
+    if (!textBgRadiusValue || !textBgRadius) return;
+    var radius = parseFloat(textBgRadius.value || "0");
+    if (!isFinite(radius)) radius = 0;
+    textBgRadiusValue.textContent = Math.round(Math.max(0, radius)) + " px";
+  }
+  updateTextBgRadiusReadout();
 
   var canvasSize = { w: canvas.getWidth(), h: canvas.getHeight() };
   var imageSize = { w: canvasSize.w, h: canvasSize.h };
@@ -222,10 +231,9 @@
   function getTextBgSettings() {
     var color = (textBgHex && textBgHex.value) || (textBgColor && textBgColor.value) || "#000000";
     var opacity = textBgOpacity ? (parseFloat(textBgOpacity.value || "0") / 100) : 0;
-    var radiusType = textBgRadius ? textBgRadius.value : "square";
-    var radius = 0;
-    if (radiusType === "soft") radius = 8;
-    if (radiusType === "round") radius = 999;
+    var radius = textBgRadius ? parseFloat(textBgRadius.value || "0") : 0;
+    if (!isFinite(radius)) radius = 0;
+    radius = Math.max(0, radius);
     return { color: color, opacity: opacity, radius: radius };
   }
 
@@ -233,14 +241,9 @@
     var base = getGuideBounds();
     var baseW = base.width || 1;
     var fontPx = (obj && obj.fontSize) ? obj.fontSize : 12;
-    var pad = Math.max(4, Math.min(36, fontPx * 0.26));
-    var boxH = box && box.height ? box.height : 0;
-    if (radius >= 999) {
-      // Rounded-pill backgrounds need extra inset so glyph corners never touch curved ends.
-      pad = Math.max(pad, (boxH * 0.56), (fontPx * 0.5));
-      pad = Math.min(96, pad);
-    } else if (radius > 0) {
-      pad = Math.max(pad, Math.min(48, fontPx * 0.32));
+    var pad = Math.max(4, Math.min(28, fontPx * 0.24));
+    if (radius > 0) {
+      pad = Math.max(pad, Math.min(30, radius * 0.35));
     }
     return { pad: pad, baseWidth: baseW };
   }
@@ -254,10 +257,14 @@
     if (textBgColor) textBgColor.value = color;
     if (textBgOpacity) textBgOpacity.value = Math.round(opacity * 100);
     if (textBgRadius) {
-      if (radius >= 999) textBgRadius.value = "round";
-      else if (radius > 0) textBgRadius.value = "soft";
-      else textBgRadius.value = "square";
+      var sliderMax = parseFloat(textBgRadius.max || "60");
+      if (!isFinite(sliderMax)) sliderMax = 60;
+      if (!isFinite(radius)) radius = 0;
+      if (radius >= 999) radius = sliderMax;
+      radius = Math.max(0, Math.min(sliderMax, radius));
+      textBgRadius.value = String(Math.round(radius));
     }
+    updateTextBgRadiusReadout();
   }
 
   function syncShapeControls(obj) {
@@ -1703,7 +1710,12 @@
     });
   }
   if (textBgRadius) {
+    textBgRadius.addEventListener("input", function () {
+      updateTextBgRadiusReadout();
+      applyTextBackgroundToSelection();
+    });
     textBgRadius.addEventListener("change", function () {
+      updateTextBgRadiusReadout();
       applyTextBackgroundToSelection();
     });
   }

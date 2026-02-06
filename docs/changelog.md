@@ -182,3 +182,5 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add hidden export form payload fields for current-canvas export and bump editor.js cache buster to v34**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > getTextBgPadding/updateTextBackground > increase padding for rounded and very-rounded text backgrounds to prevent glyph clipping at corners (including exports via captured padding)**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v35 for rounded background padding fix rollout**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > replace text background corner preset dropdown with a pixel radius slider + live readout and bump editor.js cache buster to v36**
+- **2026-02-06 > src/performance_genai/api/static/editor.js > getTextBgSettings/syncTextBgControls/getTextBgPadding > switch text background corner control to numeric slider, sync readout, and rebalance rounded-box padding to avoid over-padding**

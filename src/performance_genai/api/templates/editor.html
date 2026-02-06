@@ -348,12 +348,9 @@
                 </div>
                 <label>Opacity</label>
                 <input type="range" id="text-bg-opacity" min="0" max="100" value="0" />
-                <label>Corner</label>
-                <select id="text-bg-radius">
-                  <option value="square">square</option>
-                  <option value="soft" selected>slightly rounded</option>
-                  <option value="round">very rounded</option>
-                </select>
+                <label>Corner radius</label>
+                <input type="range" id="text-bg-radius" min="0" max="60" value="12" />
+                <div class="muted" id="text-bg-radius-value">12 px</div>
               </div>
             </details>
             <label>Font size (selected)</label>
@@ -606,6 +603,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=35"></script>
+    <script src="/static/editor.js?v=36"></script>
   </body>
 </html>
