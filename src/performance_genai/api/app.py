@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import io
 import json
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
@@ -163,6 +165,105 @@ def _build_reframe_constraints(has_motif: bool) -> str:
             "Place it on the right side behind the subject (subject occludes motif). Do not cover faces/hands.\n"
         )
     return constraints
+
+
+def _export_profiles() -> dict[str, dict[str, tuple[int, int]]]:
+    return {"performance_default": dict(settings.master_sizes)}
+
+
+def _resolve_export_size(ratio: str, size_profile: str) -> tuple[int, int]:
+    profiles = _export_profiles()
+    profile = profiles.get(size_profile) or profiles["performance_default"]
+    size = profile.get(ratio)
+    if not size:
+        raise HTTPException(status_code=400, detail=f"ratio '{ratio}' is not available in profile '{size_profile}'")
+    return size
+
+
+def _load_layout(project_id: str, layout_id: str) -> dict[str, Any]:
+    layouts_dir = Path(settings.data_dir) / "projects" / project_id / "layouts"
+    layout_path = layouts_dir / f"layout_{layout_id}.json"
+    if not layout_path.exists():
+        raise HTTPException(status_code=404, detail="layout not found")
+    try:
+        loaded = json.loads(layout_path.read_text("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=500, detail="failed to parse layout")
+    if not isinstance(loaded, dict):
+        raise HTTPException(status_code=500, detail="layout payload is invalid")
+    return loaded
+
+
+def _collect_render_elements(project_id: str, proj: Any, layout: dict[str, Any]) -> list[dict[str, Any]]:
+    elements_layout = layout.get("elements") if isinstance(layout.get("elements"), list) else []
+    if not elements_layout:
+        return []
+    out: list[dict[str, Any]] = []
+    for el in elements_layout:
+        if not isinstance(el, dict):
+            continue
+        asset_id = (el.get("asset_id") or "").strip()
+        if not asset_id:
+            continue
+        asset = next(
+            (a for a in proj.assets if a.asset_id == asset_id and a.kind in ("element", "motif", "product")),
+            None,
+        )
+        if not asset:
+            continue
+        path = store.abs_asset_path(project_id, asset)
+        if not path.exists():
+            continue
+        try:
+            img = Image.open(path).convert("RGBA")
+        except Exception:
+            continue
+        out.append({"image": img, "box": el.get("box"), "opacity": el.get("opacity", 1)})
+    return out
+
+
+def _render_layout_export_png(
+    project_id: str,
+    proj: Any,
+    layout: dict[str, Any],
+    size: tuple[int, int],
+) -> bytes:
+    kv_asset_id = (layout.get("kv_asset_id") or "").strip()
+    kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
+    if not kv_asset:
+        raise HTTPException(status_code=400, detail="layout kv_asset_id is missing or invalid")
+    kv_img = Image.open(store.abs_asset_path(project_id, kv_asset)).convert("RGB")
+    render_elements = _collect_render_elements(project_id, proj, layout)
+    if layout.get("text_layers"):
+        rendered = render_text_layers(
+            kv=kv_img,
+            size=size,
+            text_layers=layout.get("text_layers") or [],
+            font_family=layout.get("font_family") or "dejavu",
+            text_color_hex=layout.get("text_color") or "#ffffff",
+            text_align=layout.get("text_align") or "left",
+            image_box=layout.get("image_box"),
+            elements=render_elements,
+            shapes=layout.get("shapes") or [],
+        )
+    else:
+        rendered = render_text_layout(
+            kv=kv_img,
+            size=size,
+            headline=layout.get("headline") or "",
+            subhead=layout.get("subhead") or "",
+            cta=layout.get("cta") or "",
+            font_family=layout.get("font_family") or "dejavu",
+            text_color_hex=layout.get("text_color") or "#ffffff",
+            text_align=layout.get("text_align") or "left",
+            headline_box=layout.get("headline_box"),
+            subhead_box=layout.get("subhead_box"),
+            cta_box=layout.get("cta_box"),
+            image_box=layout.get("image_box"),
+            elements=render_elements,
+            shapes=layout.get("shapes") or [],
+        )
+    return _pil_to_png_bytes(rendered.image)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -494,6 +595,69 @@ async def outpaint_layout(
     )
 
     return RedirectResponse(url=f"/projects/{project_id}/editor?layout_id={new_layout_id}", status_code=303)
+
+
+@app.post("/projects/{project_id}/layouts/{layout_id}/export")
+def export_layout(
+    project_id: str,
+    layout_id: str,
+    size_profile: str = Form("performance_default"),
+):
+    proj = store.read_project(project_id)
+    layout = _load_layout(project_id, layout_id)
+    ratio = (layout.get("ratio") or layout.get("guide_ratio") or "1:1").strip() or "1:1"
+    size = _resolve_export_size(ratio, size_profile)
+    png = _render_layout_export_png(project_id, proj, layout, size)
+    safe_ratio = ratio.replace(":", "x")
+    filename = f"layout_{safe_ratio}_{size[0]}x{size[1]}.png"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=png, media_type="image/png", headers=headers)
+
+
+@app.post("/projects/{project_id}/layouts/export_selected")
+def export_selected_layouts(
+    project_id: str,
+    asset_ids: list[str] = Form(default=[]),
+    size_profile: str = Form("performance_default"),
+):
+    if not asset_ids:
+        raise HTTPException(status_code=400, detail="select at least one preview")
+    proj = store.read_project(project_id)
+    selected_previews = [a for a in proj.assets if a.kind == "text_preview" and a.asset_id in set(asset_ids)]
+    layout_ids: list[str] = []
+    seen: set[str] = set()
+    for preview in selected_previews:
+        meta = preview.metadata or {}
+        layout_id = (meta.get("ratio_layout_id") or meta.get("layout_id") or "").strip()
+        if not layout_id or layout_id in seen:
+            continue
+        seen.add(layout_id)
+        layout_ids.append(layout_id)
+    if not layout_ids:
+        raise HTTPException(status_code=400, detail="selected previews do not contain exportable layouts")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        written = 0
+        for idx, lid in enumerate(layout_ids, start=1):
+            try:
+                layout = _load_layout(project_id, lid)
+                ratio = (layout.get("ratio") or layout.get("guide_ratio") or "1:1").strip() or "1:1"
+                size = _resolve_export_size(ratio, size_profile)
+                png = _render_layout_export_png(project_id, proj, layout, size)
+            except Exception:
+                continue
+            safe_ratio = ratio.replace(":", "x")
+            name = f"{idx:02d}_{safe_ratio}_{size[0]}x{size[1]}_{lid[:6]}.png"
+            zf.writestr(name, png)
+            written += 1
+    if written == 0:
+        raise HTTPException(status_code=400, detail="no exports could be generated")
+
+    zip_bytes = buf.getvalue()
+    headers = {"Content-Disposition": 'attachment; filename="selected_layout_exports.zip"'}
+    return Response(content=zip_bytes, media_type="application/zip", headers=headers)
+
 
 @app.post("/projects/{project_id}/delete")
 def delete_project(project_id: str):

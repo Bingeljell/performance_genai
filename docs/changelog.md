@@ -175,3 +175,5 @@
 - **2026-02-06 > src/performance_genai/api/app.py > outpaint_layout > redirect to newly created outpainted layout in editor using layout_id query param**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > applyGuide/reflowWorkspaceToViewport > make workspace fill available viewport width to the right of controls and reflow on window resize**
 - **2026-02-06 > src/performance_genai/api/static/editor.js + src/performance_genai/api/templates/editor.html > syncCanvasOrder/clampObjectToWorkspace/object:moving > add full-board edge visualization, keep dotted pasteboard coverage around guide, and apply soft drag bounds with overflow allowance; bump editor.js cache buster to v33**
+- **2026-02-06 > src/performance_genai/api/app.py > _export_profiles/_resolve_export_size/_load_layout/_render_layout_export_png/export_layout/export_selected_layouts > add deterministic single and batch export endpoints that render from saved layouts at fixed pixel sizes**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add Export PNG in canvas toolbar for ratio layouts and Export selected action in Recent Previews**

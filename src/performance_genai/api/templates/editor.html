@@ -426,6 +426,10 @@
                     <input type="hidden" name="image_size" value="2K" />
                     <button class="btn" type="submit">Outpaint</button>
                   </form>
+                  <form method="post" action="/projects/{{ project.project_id }}/layouts/{{ editor_layout.layout_id }}/export" style="display:inline-flex; gap:6px; align-items:center;">
+                    <input type="hidden" name="size_profile" value="performance_default" />
+                    <button class="btn" type="submit">Export PNG</button>
+                  </form>
                 {% endif %}
                 <div class="zoom-controls">
                   <button class="btn btn-icon" id="btn-zoom-out" type="button" title="Zoom out">-</button>
@@ -540,6 +544,14 @@
                     <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
                     <input type="hidden" name="asset_kind" value="text_preview" />
                     <div class="k" style="margin-top:0; margin-bottom:8px;">
+                      <button
+                        class="btn"
+                        type="submit"
+                        formmethod="post"
+                        formaction="/projects/{{ project.project_id }}/layouts/export_selected"
+                      >
+                        Export selected
+                      </button>
                       <button class="btn btn-danger" type="submit" onclick="return confirm('Delete selected previews?');">Delete selected</button>
                     </div>
                     <div class="grid">
