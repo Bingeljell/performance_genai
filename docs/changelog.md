@@ -180,3 +180,5 @@
 - **2026-02-06 > src/performance_genai/api/app.py > export_current_layout + payload helpers > add current-canvas export endpoint so unsaved editor styling (including text backgrounds) exports correctly at fixed profile pixels**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > collectAndExportCurrent/document submit handler > route Export PNG through current-canvas payload and suppress sticky loader for download/export submits**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add hidden export form payload fields for current-canvas export and bump editor.js cache buster to v34**
+- **2026-02-06 > src/performance_genai/api/static/editor.js > getTextBgPadding/updateTextBackground > increase padding for rounded and very-rounded text backgrounds to prevent glyph clipping at corners (including exports via captured padding)**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v35 for rounded background padding fix rollout**

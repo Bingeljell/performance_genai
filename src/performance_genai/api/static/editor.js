@@ -229,11 +229,19 @@
     return { color: color, opacity: opacity, radius: radius };
   }
 
-  function getTextBgPadding(obj) {
+  function getTextBgPadding(obj, box, radius) {
     var base = getGuideBounds();
     var baseW = base.width || 1;
     var fontPx = (obj && obj.fontSize) ? obj.fontSize : 12;
-    var pad = Math.max(4, Math.min(24, fontPx * 0.22));
+    var pad = Math.max(4, Math.min(36, fontPx * 0.26));
+    var boxH = box && box.height ? box.height : 0;
+    if (radius >= 999) {
+      // Rounded-pill backgrounds need extra inset so glyph corners never touch curved ends.
+      pad = Math.max(pad, (boxH * 0.56), (fontPx * 0.5));
+      pad = Math.min(96, pad);
+    } else if (radius > 0) {
+      pad = Math.max(pad, Math.min(48, fontPx * 0.32));
+    }
     return { pad: pad, baseWidth: baseW };
   }
 
@@ -271,7 +279,7 @@
       return;
     }
     var box = getObjectRect(obj);
-    var padInfo = getTextBgPadding(obj);
+    var padInfo = getTextBgPadding(obj, box, radius);
     obj.pg_bg_pad = padInfo.pad;
     obj.pg_bg_pad_base_width = padInfo.baseWidth;
     var pad = padInfo.pad;
