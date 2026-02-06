@@ -84,6 +84,7 @@
   var btnZoomFit = document.getElementById("btn-zoom-fit");
   var zoomReadout = document.getElementById("zoom-readout");
   var btnPreviewDensity = document.getElementById("btn-preview-density");
+  var btnExportCurrent = document.getElementById("btn-export-current");
 
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
@@ -1192,6 +1193,21 @@
     if (el) el.value = value;
   }
 
+  function populateLayoutFormFields(prefix) {
+    setHidden(prefix + "-kv", select.value);
+    setHidden(prefix + "-font", fontSelect.value);
+    setHidden(prefix + "-color", colorInput.value);
+    setHidden(prefix + "-align", alignSelect.value);
+    setHidden(prefix + "-text-layers", JSON.stringify(collectTextLayers()));
+    setHidden(prefix + "-elements", JSON.stringify(collectElements()));
+    setHidden(prefix + "-shapes", JSON.stringify(collectShapes()));
+    setHidden(prefix + "-guide-ratio", guideRatio);
+    var imageBox = collectImageBox();
+    if (imageBox) {
+      setHidden(prefix + "-image-box", JSON.stringify(imageBox));
+    }
+  }
+
   function collectTextLayers() {
     var layers = [];
     var objs = getTextObjects();
@@ -1364,22 +1380,21 @@
   function collectAndSubmit() {
     if (!select.value) return;
     saveState();
-    setHidden("form-kv", select.value);
-    setHidden("form-font", fontSelect.value);
-    setHidden("form-color", colorInput.value);
-    setHidden("form-align", alignSelect.value);
+    populateLayoutFormFields("form");
     setHidden("form-font-scale", fontScale.toFixed(3));
-    setHidden("form-text-layers", JSON.stringify(collectTextLayers()));
-    setHidden("form-elements", JSON.stringify(collectElements()));
-    setHidden("form-shapes", JSON.stringify(collectShapes()));
-    setHidden("form-guide-ratio", guideRatio);
-    var imageBox = collectImageBox();
-    if (imageBox) {
-      setHidden("form-image-box", JSON.stringify(imageBox));
-    }
     var form = document.getElementById("preview-form");
     if (form) {
       showLoader();
+      form.submit();
+    }
+  }
+
+  function collectAndExportCurrent() {
+    if (!select.value) return;
+    saveState();
+    populateLayoutFormFields("eform");
+    var form = document.getElementById("export-form");
+    if (form) {
       form.submit();
     }
   }
@@ -1908,13 +1923,27 @@
     });
   }
   btnPreview.addEventListener("click", collectAndSubmit);
+  if (btnExportCurrent) {
+    btnExportCurrent.addEventListener("click", collectAndExportCurrent);
+  }
   if (btnUndo) {
     btnUndo.addEventListener("click", function () {
       undo();
     });
   }
 
-  document.addEventListener("submit", function () {
+  document.addEventListener("submit", function (e) {
+    var form = e && e.target ? e.target : null;
+    var submitter = e && e.submitter ? e.submitter : null;
+    var action = "";
+    if (submitter && submitter.formAction) {
+      action = submitter.formAction;
+    } else if (form && form.action) {
+      action = form.action;
+    }
+    if (action && action.indexOf("/export") !== -1) {
+      return;
+    }
     showLoader();
   });
   if (assetUploadBtn && assetUploadFile) {

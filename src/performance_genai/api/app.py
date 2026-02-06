@@ -266,6 +266,72 @@ def _render_layout_export_png(
     return _pil_to_png_bytes(rendered.image)
 
 
+def _parse_json_list_payload(raw: str, label: str) -> list[dict[str, Any]]:
+    if not raw.strip():
+        return []
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"{label} must be JSON list: {exc}") from exc
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail=f"{label} must be JSON list")
+    out: list[dict[str, Any]] = []
+    for item in parsed:
+        if isinstance(item, dict):
+            out.append(item)
+    return out
+
+
+def _normalize_elements_for_render(elements_payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    elements_layout: list[dict[str, Any]] = []
+    for el in elements_payload:
+        asset_id = (el.get("asset_id") or "").strip()
+        if not asset_id:
+            continue
+        box = el.get("box") if isinstance(el.get("box"), dict) else {}
+        try:
+            box_norm = (
+                float(box.get("x", 0)),
+                float(box.get("y", 0)),
+                float(box.get("w", 0)),
+                float(box.get("h", 0)),
+            )
+        except (TypeError, ValueError):
+            continue
+        elements_layout.append(
+            {
+                "asset_id": asset_id,
+                "box": box_norm,
+                "opacity": float(el.get("opacity", 1) or 1),
+            }
+        )
+    return elements_layout
+
+
+def _normalize_shapes_for_render(shapes_payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    shapes_layout: list[dict[str, Any]] = []
+    for shape in shapes_payload:
+        box = shape.get("box") if isinstance(shape.get("box"), dict) else {}
+        try:
+            box_norm = (
+                float(box.get("x", 0)),
+                float(box.get("y", 0)),
+                float(box.get("w", 0)),
+                float(box.get("h", 0)),
+            )
+        except (TypeError, ValueError):
+            continue
+        shapes_layout.append(
+            {
+                "shape": shape.get("shape") or shape.get("type") or "rect",
+                "box": box_norm,
+                "color": shape.get("color") or "#ffffff",
+                "opacity": float(shape.get("opacity", 1) or 1),
+            }
+        )
+    return shapes_layout
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     projects = store.list_projects()
@@ -610,6 +676,81 @@ def export_layout(
     png = _render_layout_export_png(project_id, proj, layout, size)
     safe_ratio = ratio.replace(":", "x")
     filename = f"layout_{safe_ratio}_{size[0]}x{size[1]}.png"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=png, media_type="image/png", headers=headers)
+
+
+@app.post("/projects/{project_id}/layouts/export_current")
+def export_current_layout(
+    project_id: str,
+    kv_asset_id: str = Form(...),
+    text_layers: str = Form(""),
+    image_box: str = Form(""),
+    elements: str = Form(""),
+    shapes: str = Form(""),
+    guide_ratio: str = Form("1:1"),
+    font_family: str = Form("dejavu"),
+    text_color: str = Form("#ffffff"),
+    text_align: str = Form("left"),
+    size_profile: str = Form("performance_default"),
+):
+    proj = store.read_project(project_id)
+    kv_asset = next((a for a in proj.assets if a.asset_id == kv_asset_id and a.kind == "kv"), None)
+    if not kv_asset:
+        raise HTTPException(status_code=400, detail="kv_asset_id must be an existing KV asset")
+
+    ratio = (guide_ratio or "1:1").strip() or "1:1"
+    size = _resolve_export_size(ratio, size_profile)
+    kv_img = Image.open(store.abs_asset_path(project_id, kv_asset)).convert("RGB")
+
+    image_box_payload = None
+    if image_box.strip():
+        try:
+            parsed_box = json.loads(image_box)
+            if isinstance(parsed_box, dict):
+                image_box_payload = parsed_box
+        except Exception:
+            image_box_payload = None
+
+    layers_payload = _parse_json_list_payload(text_layers, "text_layers")
+    elements_payload = _parse_json_list_payload(elements, "elements")
+    shapes_payload = _parse_json_list_payload(shapes, "shapes")
+
+    elements_layout = _normalize_elements_for_render(elements_payload)
+    shapes_layout = _normalize_shapes_for_render(shapes_payload)
+    pseudo_layout = {"elements": elements_layout}
+    render_elements = _collect_render_elements(project_id, proj, pseudo_layout)
+
+    if layers_payload:
+        rendered = render_text_layers(
+            kv=kv_img,
+            size=size,
+            text_layers=layers_payload,
+            font_family=font_family,
+            text_color_hex=text_color,
+            text_align=text_align,
+            image_box=image_box_payload,
+            elements=render_elements,
+            shapes=shapes_layout,
+        )
+    else:
+        rendered = render_text_layout(
+            kv=kv_img,
+            size=size,
+            headline="",
+            subhead="",
+            cta="",
+            font_family=font_family,
+            text_color_hex=text_color,
+            text_align=text_align,
+            image_box=image_box_payload,
+            elements=render_elements,
+            shapes=shapes_layout,
+        )
+
+    png = _pil_to_png_bytes(rendered.image)
+    safe_ratio = ratio.replace(":", "x")
+    filename = f"canvas_{safe_ratio}_{size[0]}x{size[1]}.png"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=png, media_type="image/png", headers=headers)
 

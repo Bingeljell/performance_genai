@@ -411,6 +411,18 @@
             <input type="hidden" name="font_scale" id="form-font-scale" />
             <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
           </form>
+          <form id="export-form" method="post" action="/projects/{{ project.project_id }}/layouts/export_current">
+            <input type="hidden" name="kv_asset_id" id="eform-kv" />
+            <input type="hidden" name="text_layers" id="eform-text-layers" />
+            <input type="hidden" name="elements" id="eform-elements" />
+            <input type="hidden" name="shapes" id="eform-shapes" />
+            <input type="hidden" name="image_box" id="eform-image-box" />
+            <input type="hidden" name="guide_ratio" id="eform-guide-ratio" />
+            <input type="hidden" name="font_family" id="eform-font" />
+            <input type="hidden" name="text_color" id="eform-color" />
+            <input type="hidden" name="text_align" id="eform-align" />
+            <input type="hidden" name="size_profile" value="performance_default" />
+          </form>
         </div>
 
         <div class="canvas-column">
@@ -426,10 +438,7 @@
                     <input type="hidden" name="image_size" value="2K" />
                     <button class="btn" type="submit">Outpaint</button>
                   </form>
-                  <form method="post" action="/projects/{{ project.project_id }}/layouts/{{ editor_layout.layout_id }}/export" style="display:inline-flex; gap:6px; align-items:center;">
-                    <input type="hidden" name="size_profile" value="performance_default" />
-                    <button class="btn" type="submit">Export PNG</button>
-                  </form>
+                  <button class="btn" id="btn-export-current" type="button">Export PNG</button>
                 {% endif %}
                 <div class="zoom-controls">
                   <button class="btn btn-icon" id="btn-zoom-out" type="button" title="Zoom out">-</button>
@@ -597,6 +606,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=33"></script>
+    <script src="/static/editor.js?v=34"></script>
   </body>
 </html>
