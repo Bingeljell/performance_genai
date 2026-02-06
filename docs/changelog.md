@@ -174,3 +174,4 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add outpaint button to canvas toolbar when editing a ratio layout**
 - **2026-02-06 > src/performance_genai/api/app.py > outpaint_layout > redirect to newly created outpainted layout in editor using layout_id query param**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > applyGuide/reflowWorkspaceToViewport > make workspace fill available viewport width to the right of controls and reflow on window resize**
+- **2026-02-06 > src/performance_genai/api/static/editor.js + src/performance_genai/api/templates/editor.html > syncCanvasOrder/clampObjectToWorkspace/object:moving > add full-board edge visualization, keep dotted pasteboard coverage around guide, and apply soft drag bounds with overflow allowance; bump editor.js cache buster to v33**

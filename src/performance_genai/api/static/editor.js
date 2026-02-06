@@ -132,6 +132,7 @@
   var guideRatio = (guideSelect && guideSelect.value) || "1:1";
   var guideBounds = null;
   var guideRect = null;
+  var boardEdgeRect = null;
   var deadzoneRects = [];
   var deadzonePatternSource = null;
   var zoomLevel = 1;
@@ -435,15 +436,47 @@
     }
   }
 
+  function updateBoardEdge() {
+    if (!boardEdgeRect) {
+      boardEdgeRect = new fabric.Rect({
+        left: 0,
+        top: 0,
+        width: canvasSize.w,
+        height: canvasSize.h,
+        fill: "rgba(0,0,0,0)",
+        stroke: "rgba(255,255,255,0.28)",
+        strokeWidth: 1,
+        selectable: false,
+        evented: false,
+        hoverCursor: "default",
+        excludeFromExport: true,
+      });
+      boardEdgeRect.pg_is_board_edge = true;
+      canvas.add(boardEdgeRect);
+    } else {
+      boardEdgeRect.set({
+        left: 0,
+        top: 0,
+        width: canvasSize.w,
+        height: canvasSize.h,
+      });
+    }
+    boardEdgeRect.setCoords();
+  }
+
   function updateDeadzoneOverlay(bounds) {
     ensureDeadzoneRects();
-    var fullW = canvasSize.w;
-    var fullH = canvasSize.h;
+    var fullW = Math.max(0, canvasSize.w);
+    var fullH = Math.max(0, canvasSize.h);
+    var left = Math.max(0, Math.floor(bounds.left));
+    var top = Math.max(0, Math.floor(bounds.top));
+    var right = Math.min(fullW, Math.ceil(bounds.left + bounds.width));
+    var bottom = Math.min(fullH, Math.ceil(bounds.top + bounds.height));
     var zones = [
-      { left: 0, top: 0, width: fullW, height: Math.max(0, bounds.top) },
-      { left: 0, top: bounds.top, width: Math.max(0, bounds.left), height: bounds.height },
-      { left: bounds.left + bounds.width, top: bounds.top, width: Math.max(0, fullW - (bounds.left + bounds.width)), height: bounds.height },
-      { left: 0, top: bounds.top + bounds.height, width: fullW, height: Math.max(0, fullH - (bounds.top + bounds.height)) },
+      { left: 0, top: 0, width: fullW, height: top },
+      { left: 0, top: top, width: left, height: Math.max(0, bottom - top) },
+      { left: right, top: top, width: Math.max(0, fullW - right), height: Math.max(0, bottom - top) },
+      { left: 0, top: bottom, width: fullW, height: Math.max(0, fullH - bottom) },
     ];
     for (var i = 0; i < deadzoneRects.length; i++) {
       var rect = deadzoneRects[i];
@@ -464,6 +497,7 @@
       canvas.sendToBack(bgObj);
     }
     ensureDeadzoneRects();
+    updateBoardEdge();
     var start = bgObj ? 1 : 0;
     for (var i = 0; i < deadzoneRects.length; i++) {
       var rect = deadzoneRects[i];
@@ -472,8 +506,48 @@
       }
       canvas.moveTo(rect, start + i);
     }
+    if (boardEdgeRect && canvas.getObjects().indexOf(boardEdgeRect) === -1) {
+      canvas.add(boardEdgeRect);
+    }
+    if (boardEdgeRect) {
+      canvas.bringToFront(boardEdgeRect);
+    }
     if (guideRect) {
       canvas.bringToFront(guideRect);
+    }
+  }
+
+  function getDragOverflowRatio(obj) {
+    if (!obj) return 0.25;
+    if (obj.pg_is_background) return 0.45;
+    return 0.25;
+  }
+
+  function clampObjectToWorkspace(obj) {
+    if (!obj) return;
+    if (obj === guideRect || obj.pg_is_deadzone || obj.pg_is_board_edge || obj.pg_is_text_bg) return;
+    var rect = getObjectRect(obj);
+    var over = getDragOverflowRatio(obj);
+    var maxOverX = canvasSize.w * over;
+    var maxOverY = canvasSize.h * over;
+    var minLeft = -maxOverX;
+    var maxLeft = canvasSize.w - rect.width + maxOverX;
+    var minTop = -maxOverY;
+    var maxTop = canvasSize.h - rect.height + maxOverY;
+    var nextLeft = obj.left;
+    var nextTop = obj.top;
+    if (maxLeft < minLeft) {
+      nextLeft = (minLeft + maxLeft) / 2;
+    } else {
+      nextLeft = Math.max(minLeft, Math.min(maxLeft, nextLeft));
+    }
+    if (maxTop < minTop) {
+      nextTop = (minTop + maxTop) / 2;
+    } else {
+      nextTop = Math.max(minTop, Math.min(maxTop, nextTop));
+    }
+    if (nextLeft !== obj.left || nextTop !== obj.top) {
+      obj.set({ left: nextLeft, top: nextTop });
     }
   }
 
@@ -871,6 +945,7 @@
       "pg_bg_for",
       "pg_is_guide",
       "pg_is_deadzone",
+      "pg_is_board_edge",
       "pg_is_shape",
       "pg_shape_type",
       "pg_shape_color",
@@ -878,7 +953,7 @@
     ]);
     if (json && Array.isArray(json.objects)) {
       json.objects = json.objects.filter(function (obj) {
-        return !(obj && (obj.pg_is_guide || obj.pg_is_deadzone));
+        return !(obj && (obj.pg_is_guide || obj.pg_is_deadzone || obj.pg_is_board_edge));
       });
     }
     var serialized = "";
@@ -1008,7 +1083,7 @@
       var dy = nextOffset.y - currentOffset.y;
       if (dx || dy) {
         canvas.getObjects().forEach(function (obj) {
-          if (!obj || obj === guideRect || obj.pg_is_background || obj.pg_is_deadzone) return;
+          if (!obj || obj === guideRect || obj.pg_is_background || obj.pg_is_deadzone || obj.pg_is_board_edge) return;
           obj.set({ left: obj.left + dx, top: obj.top + dy });
         });
       }
@@ -1392,7 +1467,7 @@
   function updateLayerPanel() {
     if (!layerPanel) return;
     var objs = canvas.getObjects().filter(function (obj) {
-      return obj && obj !== guideRect && !obj.pg_is_text_bg && !obj.pg_is_deadzone && !obj.pg_is_guide;
+      return obj && obj !== guideRect && !obj.pg_is_text_bg && !obj.pg_is_deadzone && !obj.pg_is_guide && !obj.pg_is_board_edge;
     });
     layerPanel.innerHTML = "";
     if (!objs.length) {
@@ -1502,6 +1577,7 @@
   }
 
   canvas.on("object:modified", function (e) {
+    clampObjectToWorkspace(e.target);
     normalizeObjectScale(e.target);
     if (e.target && e.target.pg_is_background) {
       currentOffset = { x: e.target.left || 0, y: e.target.top || 0 };
@@ -1516,6 +1592,7 @@
     updateLayerPanel();
   });
   canvas.on("object:moving", function (e) {
+    clampObjectToWorkspace(e.target);
     if (e.target && e.target.type === "textbox") {
       updateTextBackground(e.target);
     }
@@ -1528,13 +1605,13 @@
     queueSnapshot();
   });
   canvas.on("object:added", function (e) {
-    if (e.target && e.target !== guideRect && !e.target.pg_is_deadzone && !e.target.pg_is_guide) {
+    if (e.target && e.target !== guideRect && !e.target.pg_is_deadzone && !e.target.pg_is_guide && !e.target.pg_is_board_edge) {
       ensureObjectId(e.target);
       updateLayerPanel();
     }
   });
   canvas.on("object:removed", function (e) {
-    if (e.target && e.target !== guideRect && !e.target.pg_is_deadzone && !e.target.pg_is_guide) {
+    if (e.target && e.target !== guideRect && !e.target.pg_is_deadzone && !e.target.pg_is_guide && !e.target.pg_is_board_edge) {
       if (e.target.type === "textbox") {
         removeTextBackground(e.target);
       }
@@ -1724,6 +1801,7 @@
       handled = true;
     }
     if (handled) {
+      clampObjectToWorkspace(obj);
       obj.setCoords();
       canvas.renderAll();
       if (obj.pg_is_background) {
