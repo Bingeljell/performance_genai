@@ -194,3 +194,4 @@
 - **2026-02-06 > src/performance_genai/storage.py > FileStorage > remove unused update_asset_metadata helper after shortlist flow removal**
 - **2026-02-06 > docs/implementation_poa.md + docs/implementation_progress.md > phase/workflow bullets > replace shortlist/batch-ratio language with direct editor-first base-visual flow**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > layout/controls-panel/asset-menu-content styles > narrow left control rail and make Add Asset/shape/text background menus self-scrolling overlays so they do not create horizontal scroll in the main controls panel**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html + src/performance_genai/api/static/editor.js > layer-panel overlay placement + layers-count sync > move Layers out of left controls into RHS overlay stack (above Copy Sets/Recent Previews) and keep live layer count badge updated**

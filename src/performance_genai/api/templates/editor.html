@@ -459,9 +459,7 @@
           </div>
 
           <div class="control-group">
-            <div class="group-title">Layers</div>
-            <div id="layer-panel" class="layer-list"></div>
-            <div class="muted" style="margin-top:10px;">Arrow keys nudge selected layer (Shift = 10px).</div>
+            <div class="group-title">Output</div>
             <button class="btn btn-primary" id="btn-preview" type="button" style="margin-top:10px;">Generate previews (1:1, 4:5, 9:16)</button>
           </div>
 
@@ -525,6 +523,20 @@
           </div>
 
           <div class="rhs-overlays">
+            <details class="overlay-panel" id="overlay-layers">
+              <summary>
+                <div class="overlay-trigger">
+                  <span class="name">Layers</span>
+                  <span class="meta" id="layers-count">0</span>
+                </div>
+              </summary>
+              <div class="overlay-body">
+                <div class="overlay-title">Layers</div>
+                <div class="muted">Arrow keys nudge selected layer (Shift = 10px).</div>
+                <div id="layer-panel" class="layer-list"></div>
+              </div>
+            </details>
+
             <details class="overlay-panel" id="overlay-copy">
               <summary>
                 <div class="overlay-trigger">
@@ -673,6 +685,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=37"></script>
+    <script src="/static/editor.js?v=38"></script>
   </body>
 </html>

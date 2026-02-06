@@ -75,6 +75,7 @@
   var copyButtons = document.querySelectorAll(".use-copy-set");
   var assetInsertButtons = document.querySelectorAll("[data-insert-asset]");
   var layerPanel = document.getElementById("layer-panel");
+  var layersCount = document.getElementById("layers-count");
   var ratioLabel = document.getElementById("ratio-label");
   var loadingOverlay = document.getElementById("loading-overlay");
   var canvasWrap = document.getElementById("canvas-wrap");
@@ -1496,10 +1497,15 @@
   }
 
   function updateLayerPanel() {
+    function syncLayerCount(count) {
+      if (!layersCount) return;
+      layersCount.textContent = String(Math.max(0, count || 0));
+    }
     if (!layerPanel) return;
     var objs = canvas.getObjects().filter(function (obj) {
       return obj && obj !== guideRect && !obj.pg_is_text_bg && !obj.pg_is_deadzone && !obj.pg_is_guide && !obj.pg_is_board_edge;
     });
+    syncLayerCount(objs.length);
     layerPanel.innerHTML = "";
     if (!objs.length) {
       layerPanel.innerHTML = "<div class=\"muted\">No layers yet.</div>";
