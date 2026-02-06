@@ -74,6 +74,7 @@
   var btnSendBack = document.getElementById("btn-send-back");
   var copyButtons = document.querySelectorAll(".use-copy-set");
   var assetInsertButtons = document.querySelectorAll("[data-insert-asset]");
+  var assetMenus = document.querySelectorAll(".asset-menu");
   var layerPanel = document.getElementById("layer-panel");
   var layersCount = document.getElementById("layers-count");
   var ratioLabel = document.getElementById("ratio-label");
@@ -102,6 +103,7 @@
   var assetUploadBtn = document.getElementById("btn-upload-asset");
   var assetUploadFile = document.getElementById("asset-upload-file");
   var assetUploadName = document.getElementById("asset-upload-name");
+  var controlsPanel = document.querySelector(".controls-panel");
 
   if (!select || !document.getElementById("editor-canvas")) return;
 
@@ -126,6 +128,74 @@
 
   if (colorSwatch && colorInput) {
     colorSwatch.style.background = colorInput.value || "#ffffff";
+  }
+
+  function closeOtherAssetMenus(activeMenu) {
+    if (!assetMenus || !assetMenus.length) return;
+    for (var i = 0; i < assetMenus.length; i++) {
+      var menu = assetMenus[i];
+      if (!menu || menu === activeMenu) continue;
+      if (menu.open) {
+        menu.open = false;
+      }
+    }
+  }
+
+  function positionAssetMenu(menu) {
+    if (!menu || !menu.open) return;
+    var summary = menu.querySelector("summary");
+    var panel = menu.querySelector(".asset-menu-content");
+    if (!summary || !panel) return;
+
+    var margin = 12;
+    panel.style.left = margin + "px";
+    panel.style.top = margin + "px";
+
+    var trigger = summary.getBoundingClientRect();
+    var panelW = panel.offsetWidth || 320;
+    var panelH = panel.offsetHeight || 420;
+    var left = trigger.left;
+    if (left + panelW > window.innerWidth - margin) {
+      left = window.innerWidth - panelW - margin;
+    }
+    if (left < margin) left = margin;
+
+    var top = trigger.bottom + 8;
+    if (top + panelH > window.innerHeight - margin) {
+      var above = trigger.top - panelH - 8;
+      if (above >= margin) {
+        top = above;
+      } else {
+        top = Math.max(margin, window.innerHeight - panelH - margin);
+      }
+    }
+
+    panel.style.left = Math.round(left) + "px";
+    panel.style.top = Math.round(top) + "px";
+  }
+
+  function positionOpenAssetMenus() {
+    if (!assetMenus || !assetMenus.length) return;
+    for (var i = 0; i < assetMenus.length; i++) {
+      if (assetMenus[i] && assetMenus[i].open) {
+        positionAssetMenu(assetMenus[i]);
+      }
+    }
+  }
+
+  if (assetMenus && assetMenus.length) {
+    for (var m = 0; m < assetMenus.length; m++) {
+      assetMenus[m].addEventListener("toggle", function () {
+        if (!this.open) return;
+        closeOtherAssetMenus(this);
+        positionAssetMenu(this);
+      });
+    }
+    document.addEventListener("click", function (e) {
+      var target = e.target;
+      if (!target || (target.closest && target.closest(".asset-menu"))) return;
+      closeOtherAssetMenus(null);
+    });
   }
 
   function updateTextBgRadiusReadout() {
@@ -1904,8 +1974,14 @@
     if (resizeTimer) window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(function () {
       reflowWorkspaceToViewport();
+      positionOpenAssetMenus();
     }, 120);
   });
+  if (controlsPanel) {
+    controlsPanel.addEventListener("scroll", function () {
+      positionOpenAssetMenus();
+    });
+  }
   if (btnCenterGuide) {
     btnCenterGuide.addEventListener("click", function () {
       centerGuideInViewport();
