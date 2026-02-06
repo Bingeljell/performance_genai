@@ -65,9 +65,9 @@
       .overlay-panel > summary {
         list-style: none;
         padding: 0;
-        border: 1px solid rgba(255,255,255,0.20);
+        border: 1px solid rgba(255,255,255,0.38);
         border-radius: 14px;
-        background: linear-gradient(160deg, rgba(245,243,238,0.14), rgba(245,243,238,0.04));
+        background: linear-gradient(160deg, rgba(245,243,238,0.34), rgba(245,243,238,0.18));
         color: var(--text);
         cursor: pointer;
         min-width: 184px;
@@ -76,12 +76,12 @@
       }
       .overlay-panel > summary:hover {
         transform: translateY(-1px);
-        border-color: rgba(255,255,255,0.34);
-        background: linear-gradient(160deg, rgba(245,243,238,0.20), rgba(245,243,238,0.07));
+        border-color: rgba(255,255,255,0.52);
+        background: linear-gradient(160deg, rgba(245,243,238,0.42), rgba(245,243,238,0.22));
       }
       .overlay-panel[open] > summary {
-        border-color: rgba(255,255,255,0.42);
-        background: linear-gradient(160deg, rgba(245,243,238,0.25), rgba(245,243,238,0.10));
+        border-color: rgba(255,255,255,0.60);
+        background: linear-gradient(160deg, rgba(245,243,238,0.50), rgba(245,243,238,0.28));
       }
       .overlay-panel > summary::-webkit-details-marker { display: none; }
       .overlay-trigger {
@@ -96,14 +96,15 @@
         text-transform: uppercase;
       }
       .overlay-trigger .name {
-        color: rgba(255,255,255,0.96);
+        color: rgba(255,255,255,0.98);
         font-weight: 700;
       }
       .overlay-trigger .meta {
-        color: rgba(255,255,255,0.74);
+        color: rgba(255,255,255,0.96);
         font-weight: 600;
         font-size: 11px;
-        border: 1px solid rgba(255,255,255,0.22);
+        border: 1px solid rgba(255,255,255,0.42);
+        background: rgba(8,10,14,0.38);
         border-radius: 999px;
         padding: 2px 7px;
         min-width: 26px;
@@ -139,6 +140,10 @@
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
       .thumb { width: 100%; height: auto; object-fit: contain; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.22); }
       .item { border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; padding: 10px; background: rgba(0,0,0,0.20); }
+      #overlay-previews .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+      #overlay-previews .item { padding: 7px; border-radius: 10px; }
+      #overlay-previews .thumb { border-radius: 8px; max-height: 88px; object-fit: contain; }
+      #overlay-previews .k { gap: 6px; }
       .k { display:flex; justify-content: space-between; gap: 8px; margin-top: 8px; align-items: center; }
       summary { list-style: none; }
       summary::-webkit-details-marker { display: none; }
