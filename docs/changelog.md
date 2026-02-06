@@ -184,3 +184,4 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > bump editor.js cache buster to v35 for rounded background padding fix rollout**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > replace text background corner preset dropdown with a pixel radius slider + live readout and bump editor.js cache buster to v36**
 - **2026-02-06 > src/performance_genai/api/static/editor.js > getTextBgSettings/syncTextBgControls/getTextBgPadding > switch text background corner control to numeric slider, sync readout, and rebalance rounded-box padding to avoid over-padding**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > canvas-wrap/canvas-toolbar/canvas-stage styles > make top canvas controls sticky, remove framed canvas border for an infinite-workspace feel, and remove internal vertical canvas scroll to avoid dual scrollbars**
