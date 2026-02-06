@@ -364,7 +364,6 @@ def project_page(request: Request, project_id: str):
     kvs = [a for a in assets if a.kind == "kv"]
     base_kvs = [a for a in kvs if not (a.metadata or {}).get("source_kv_asset_id")]
     ratio_kvs = [a for a in kvs if (a.metadata or {}).get("source_kv_asset_id")]
-    shortlisted_kvs = [a for a in base_kvs if (a.metadata or {}).get("shortlisted")]
     text_previews = [a for a in assets if a.kind == "text_preview"]
     masters = [a for a in assets if a.kind == "master"]
     motifs = [a for a in assets if a.kind == "motif"]
@@ -400,7 +399,6 @@ def project_page(request: Request, project_id: str):
             "kvs": kvs,
             "base_kvs": base_kvs,
             "ratio_kvs": ratio_kvs,
-            "shortlisted_kvs": shortlisted_kvs,
             "text_previews": text_previews,
             "masters": masters,
             "motifs": motifs,
@@ -822,13 +820,6 @@ def delete_asset(project_id: str, asset_id: str, return_to: str = Form("")):
     return RedirectResponse(url=redirect_path, status_code=303)
 
 
-@app.post("/projects/{project_id}/kvs/{asset_id}/shortlist")
-def shortlist_kv(project_id: str, asset_id: str, shortlisted: str = Form("1")):
-    value = _parse_bool(shortlisted)
-    store.update_asset_metadata(project_id, asset_id, {"shortlisted": value})
-    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
-
-
 @app.post("/projects/{project_id}/assets/bulk_delete")
 def bulk_delete_assets(
     project_id: str,
@@ -1054,102 +1045,6 @@ async def reframe_kv(
                 "n_requested": int(n),
             },
             "outputs": {"kv_asset_ids": kv_asset_ids},
-        },
-    )
-    return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
-
-
-@app.post("/projects/{project_id}/kvs/reframe_batch")
-async def reframe_kv_batch(
-    project_id: str,
-    aspect_ratios: list[str] = Form(default=[]),
-    image_size: str = Form("2K"),
-    n_per_ratio: int = Form(1),
-    prompt: str = Form("Return the SAME image, just expanded to the target aspect ratio by outpainting ONLY the new canvas areas."),
-    motif_asset_id: str = Form(""),
-):
-    proj = store.read_project(project_id)
-    kvs = [a for a in proj.assets if a.kind == "kv"]
-    shortlisted = [a for a in kvs if (a.metadata or {}).get("shortlisted")]
-    if not shortlisted:
-        raise HTTPException(status_code=400, detail="shortlist at least one KV first")
-    if not aspect_ratios:
-        raise HTTPException(status_code=400, detail="select at least one target ratio")
-
-    motif_path: Path | None = None
-    if motif_asset_id:
-        motif_asset = next((a for a in proj.assets if a.asset_id == motif_asset_id and a.kind == "motif"), None)
-        if motif_asset:
-            motif_path = store.abs_asset_path(project_id, motif_asset)
-
-    gemini = _get_gemini()
-    batch_id = uuid.uuid4().hex[:12]
-    sys_constraints = _build_reframe_constraints(motif_path is not None)
-    full_prompt = f"{prompt}\n\n{sys_constraints}"
-
-    all_outputs: list[dict[str, Any]] = []
-    all_kv_asset_ids: list[str] = []
-
-    for kv in shortlisted:
-        kv_path = store.abs_asset_path(project_id, kv)
-        source_label = (kv.metadata or {}).get("display_name") or kv.filename
-        for ratio in aspect_ratios:
-            images = await gemini.reframe_kv_with_motif(
-                kv_image=kv_path,
-                motif_image=motif_path,
-                prompt=full_prompt,
-                aspect_ratio=ratio,
-                image_size=image_size,
-                n=int(n_per_ratio),
-            )
-            created_ids: list[str] = []
-            for idx, gi in enumerate(images):
-                buf = _pil_to_png_bytes(gi.image)
-                safe_ratio = ratio.replace(":", "x")
-                display_label = f"{source_label}_{ratio}_{idx + 1}"
-                asset = store.add_asset(
-                    project_id=project_id,
-                    kind="kv",
-                    filename=f"kv_reframe_{safe_ratio}_{idx}.png",
-                    content=buf,
-                    metadata={
-                        "provider": gi.provider,
-                        "model": gi.model,
-                        "prompt": gi.prompt_used,
-                        "source_kv_asset_id": kv.asset_id,
-                        "motif_asset_id": motif_asset_id or None,
-                        "aspect_ratio": ratio,
-                        "image_size": image_size,
-                        "batch_id": batch_id,
-                        "display_name": display_label,
-                    },
-                    subdir="kvs",
-                )
-                created_ids.append(asset.asset_id)
-                all_kv_asset_ids.append(asset.asset_id)
-            all_outputs.append(
-                {
-                    "source_kv_asset_id": kv.asset_id,
-                    "aspect_ratio": ratio,
-                    "kv_asset_ids": created_ids,
-                }
-            )
-
-    store.write_run_manifest(
-        project_id,
-        {
-            "type": "kv_reframe_batch",
-            "provider": gemini.name,
-            "model": settings.gemini_image_model,
-            "inputs": {
-                "batch_id": batch_id,
-                "kv_asset_ids": [k.asset_id for k in shortlisted],
-                "motif_asset_id": motif_asset_id or None,
-                "aspect_ratios": aspect_ratios,
-                "image_size": image_size,
-                "n_per_ratio": int(n_per_ratio),
-            },
-            "outputs": {"kv_asset_ids": all_kv_asset_ids, "groups": all_outputs},
         },
     )
     return RedirectResponse(url=f"/projects/{project_id}", status_code=303)

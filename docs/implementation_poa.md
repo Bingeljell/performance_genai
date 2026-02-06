@@ -308,8 +308,8 @@ For a sample master builder and manifest shape, see `docs/sample_quickstart_code
 
 - Make the core flow fast and obvious:
   - Visual pool generation (n <= 5)
-  - shortlist selection
-  - batch "generate ratios" for shortlisted visuals
+  - select a base visual and open editor
+  - generate/edit ratio previews from editor
 - Reduce reframe drift where possible:
   - stricter reframe constraints, locked-canvas outpaint bias
   - optional motif enforcement (avoid motif invention)

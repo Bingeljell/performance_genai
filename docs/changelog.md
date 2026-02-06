@@ -190,3 +190,6 @@
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > rhs-overlays top offset > move Copy Sets/Recent Previews overlay stack lower to avoid overlap with canvas zoom/fit controls**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > rhs-overlays top offset > move Copy Sets/Recent Previews overlay stack down by an additional 100px for responsive-height overlap cases**
 - **2026-02-06 > src/performance_genai/api/templates/project.html > Visual Pool actions/topbar labels > remove shortlist/remove/delete per-card actions and the Shortlisted panel to simplify card layout and prevent action overflow**
+- **2026-02-06 > src/performance_genai/api/app.py > project_page/shortlist_kv/reframe_kv_batch > remove shortlist context and fully remove shortlist + batch-reframe endpoints to match current editor-first flow**
+- **2026-02-06 > src/performance_genai/storage.py > FileStorage > remove unused update_asset_metadata helper after shortlist flow removal**
+- **2026-02-06 > docs/implementation_poa.md + docs/implementation_progress.md > phase/workflow bullets > replace shortlist/batch-ratio language with direct editor-first base-visual flow**

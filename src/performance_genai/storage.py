@@ -138,32 +138,6 @@ class ProjectStore:
                 # Best-effort deletion in v0.
                 pass
 
-    def update_asset_metadata(self, project_id: str, asset_id: str, updates: dict[str, Any]) -> None:
-        proj = self.read_project(project_id)
-        changed = False
-        refreshed: list[Asset] = []
-        for a in proj.assets:
-            if a.asset_id != asset_id:
-                refreshed.append(a)
-                continue
-            new_meta = dict(a.metadata or {})
-            new_meta.update(updates)
-            refreshed.append(
-                Asset(
-                    asset_id=a.asset_id,
-                    kind=a.kind,
-                    filename=a.filename,
-                    rel_path=a.rel_path,
-                    sha256=a.sha256,
-                    created_at=a.created_at,
-                    metadata=new_meta,
-                )
-            )
-            changed = True
-        if changed:
-            proj.assets = refreshed
-            self._write_project(proj)
-
     def add_asset(
         self,
         project_id: str,

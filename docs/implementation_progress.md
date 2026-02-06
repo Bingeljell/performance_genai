@@ -137,10 +137,9 @@ We discussed simplifying the experience and focusing on "master visual correctne
 Proposed flow:
 1) User uploads references (and optionally motif/logo assets).
 2) User generates a small pool of **1:1 master visuals** (n options, max 5).
-3) Tool displays the pool and user shortlists.
-4) User opens the **editor** and adds text/logo/motif layers.
-5) Tool renders multi-ratio previews (deterministic) so users can validate layout early.
-6) When a ratio needs more background than crop/pad can provide, optionally run **AI outpaint** on the background only (never on text/logo layers).
+3) User opens the chosen visual in the **editor** and adds text/logo/motif layers.
+4) Tool renders multi-ratio previews (deterministic) so users can validate layout early.
+5) When a ratio needs more background than crop/pad can provide, optionally run **AI outpaint** on the background only (never on text/logo layers).
 
 Rationale:
 - Keep the v0 prototype focused and reduce UI clutter.
