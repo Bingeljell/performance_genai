@@ -168,3 +168,5 @@
 - **2026-02-06 > src/performance_genai/api/static/editor.js > deadzone overlay + zoom/pan handlers > render dotted dead area outside guide, add zoom in/out/fit controls, and support space-drag panning with zoom-aware viewport movement**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > restyle RHS overlay triggers with stronger visual hierarchy and add live count chips for copy sets and previews**
 - **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > increase RHS overlay trigger opacity/contrast for readability and reduce Recent Previews thumbnail/card footprint for lower vertical scroll**
+- **2026-02-06 > src/performance_genai/api/templates/editor.html > n/a > add compact/comfy density toggle UI in Recent Previews and shrink preview card typography/button sizing for compact mode**
+- **2026-02-06 > src/performance_genai/api/static/editor.js > applyPreviewDensity/loadPreviewDensity/savePreviewDensity > persist and apply Recent Previews density mode per project**

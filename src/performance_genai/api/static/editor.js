@@ -27,6 +27,7 @@
 
   var projectId = (document.body && document.body.dataset && document.body.dataset.projectId) || "default";
   var stateKey = "pg_editor_state_" + projectId;
+  var previewDensityKey = "pg_preview_density_" + projectId;
   var debugEl = document.getElementById("debug-log");
   function log(msg) {
     if (!debugEl) return;
@@ -82,6 +83,7 @@
   var btnZoomOut = document.getElementById("btn-zoom-out");
   var btnZoomFit = document.getElementById("btn-zoom-fit");
   var zoomReadout = document.getElementById("zoom-readout");
+  var btnPreviewDensity = document.getElementById("btn-preview-density");
 
   var colorPicker = document.getElementById("color-picker");
   var colorInput = document.getElementById("color-input");
@@ -1339,6 +1341,33 @@
     });
   }
 
+  function loadPreviewDensity() {
+    try {
+      var mode = localStorage.getItem(previewDensityKey);
+      if (mode === "comfy" || mode === "compact") return mode;
+      return "compact";
+    } catch (e) {
+      return "compact";
+    }
+  }
+
+  function savePreviewDensity(mode) {
+    try {
+      localStorage.setItem(previewDensityKey, mode);
+    } catch (e) {
+      // Ignore quota errors.
+    }
+  }
+
+  function applyPreviewDensity(mode) {
+    if (!document.body) return;
+    var comfy = mode === "comfy";
+    document.body.classList.toggle("preview-density-comfy", comfy);
+    if (btnPreviewDensity) {
+      btnPreviewDensity.textContent = comfy ? "Density: Comfy" : "Density: Compact";
+    }
+  }
+
   function updateLayerPanel() {
     if (!layerPanel) return;
     var objs = canvas.getObjects().filter(function (obj) {
@@ -1733,6 +1762,15 @@
   if (btnCenterGuide) {
     btnCenterGuide.addEventListener("click", function () {
       centerGuideInViewport();
+    });
+  }
+  var previewDensityMode = loadPreviewDensity();
+  applyPreviewDensity(previewDensityMode);
+  if (btnPreviewDensity) {
+    btnPreviewDensity.addEventListener("click", function () {
+      previewDensityMode = previewDensityMode === "compact" ? "comfy" : "compact";
+      applyPreviewDensity(previewDensityMode);
+      savePreviewDensity(previewDensityMode);
     });
   }
   if (btnZoomIn) {

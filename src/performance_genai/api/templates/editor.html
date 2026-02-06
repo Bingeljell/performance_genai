@@ -143,7 +143,21 @@
       #overlay-previews .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
       #overlay-previews .item { padding: 7px; border-radius: 10px; }
       #overlay-previews .thumb { border-radius: 8px; max-height: 88px; object-fit: contain; }
-      #overlay-previews .k { gap: 6px; }
+      #overlay-previews .k { gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+      #overlay-previews .k .btn { padding: 4px 6px; border-radius: 8px; font-size: 10px; }
+      #overlay-previews .k a { font-size: 10px; line-height: 1.2; }
+      #overlay-previews .k small { font-size: 10px; }
+      #overlay-previews .k label { font-size: 10px; }
+      #overlay-previews .muted { font-size: 10px; }
+      #overlay-previews .overlay-actions { display:flex; align-items:center; gap:6px; flex-wrap: wrap; }
+      body.preview-density-comfy #overlay-previews .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+      body.preview-density-comfy #overlay-previews .item { padding: 9px; border-radius: 12px; }
+      body.preview-density-comfy #overlay-previews .thumb { max-height: 130px; border-radius: 10px; }
+      body.preview-density-comfy #overlay-previews .k .btn { font-size: 11px; padding: 5px 8px; }
+      body.preview-density-comfy #overlay-previews .k a,
+      body.preview-density-comfy #overlay-previews .k small,
+      body.preview-density-comfy #overlay-previews .k label,
+      body.preview-density-comfy #overlay-previews .muted { font-size: 11px; }
       .k { display:flex; justify-content: space-between; gap: 8px; margin-top: 8px; align-items: center; }
       summary { list-style: none; }
       summary::-webkit-details-marker { display: none; }
@@ -469,10 +483,13 @@
                 {% if text_previews %}
                   <div class="k" style="margin-bottom:8px;">
                     <div class="muted">Preview assets</div>
-                    <label class="muted" style="display:flex; align-items:center; gap:6px;">
-                      <input type="checkbox" id="preview-select-all" />
-                      Select all
-                    </label>
+                    <div class="overlay-actions">
+                      <button class="btn" id="btn-preview-density" type="button" title="Toggle preview density">Density: Compact</button>
+                      <label class="muted" style="display:flex; align-items:center; gap:6px;">
+                        <input type="checkbox" id="preview-select-all" />
+                        Select all
+                      </label>
+                    </div>
                   </div>
                   <form method="post" action="/projects/{{ project.project_id }}/assets/bulk_delete">
                     <input type="hidden" name="return_to" value="/projects/{{ project.project_id }}/editor" />
@@ -485,9 +502,9 @@
                         <div class="k">
                           <small class="muted">{{ a.metadata.ratio }}</small>
                           <div style="display:flex; gap:8px; align-items:center;">
-                            <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">open</a>
+                            <a class="muted" href="/projects/{{ project.project_id }}/assets/{{ a.asset_id }}" target="_blank">Open</a>
                             {% if a.metadata.ratio_layout_id %}
-                              <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">open in editor</a>
+                              <a class="muted" href="/projects/{{ project.project_id }}/editor?layout_id={{ a.metadata.ratio_layout_id }}">Editor</a>
                               <button
                                 class="btn"
                                 type="submit"
@@ -549,6 +566,6 @@
         <div>Working…</div>
       </div>
     </div>
-    <script src="/static/editor.js?v=30"></script>
+    <script src="/static/editor.js?v=31"></script>
   </body>
 </html>
